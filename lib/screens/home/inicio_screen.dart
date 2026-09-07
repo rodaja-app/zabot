@@ -403,10 +403,20 @@ class _ConnectionCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  l10n.home_connection_card_title,
-                  style: Theme.of(context).textTheme.titleMedium,
+                // Envolvido em Expanded: sem isso, o título "Conexão com o
+                // WhatsApp" + o badge disputam a mesma largura da Row e,
+                // quando não cabem, o badge é empurrado pra fora do Card
+                // (ficava com a borda direita cortada/vazando no
+                // TestFlight). Com Expanded o texto quebra/encolhe e o
+                // badge (mainAxisSize.min) sempre permanece inteiro e
+                // visível.
+                Expanded(
+                  child: Text(
+                    l10n.home_connection_card_title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
+                const SizedBox(width: 8),
                 StatusBadge(status: _badgeStatus, label: _badgeLabel()),
               ],
             ),

@@ -82,6 +82,10 @@ class _MensagensScreenState extends State<MensagensScreen>
         Expanded(
           child: TabBarView(
             controller: _tabController,
+            // Sem isso, dava pra arrastar o dedo pro lado e trocar de aba
+            // (Campanhas/Contatos) por gesto, duplicando o clique nas abas
+            // do TabBar acima — troca de aba agora só pelo toque no nome.
+            physics: const NeverScrollableScrollPhysics(),
             children: [
               _CampaignsTab(
                 messageRepository: widget.messageRepository,
