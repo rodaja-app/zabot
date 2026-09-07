@@ -171,58 +171,72 @@ class _AccountCard extends StatelessWidget {
 
   /// Conteúdo (nome/e-mail) só aparece dentro do modal, ao clicar no botão
   /// "Minha Conta" — evita expor o e-mail direto na lista do Menu.
-  Future<void> _showAccountDialog(BuildContext context) {
-    return showDialog<void>(
+  ///
+  /// Antes usava FutureBuilder dentro do AlertDialog: mesmo com o Future já
+  /// resolvido (carregado no initState da tela), o FutureBuilder sempre
+  /// renderiza um primeiro frame em "waiting" antes do microtask resolver,
+  /// o que aparecia como um loading piscando rápido toda vez que o modal
+  /// abria. Agora aguardamos o Future ANTES de abrir o diálogo, então ele
+  /// já nasce com o conteúdo final pronto.
+  Future<void> _showAccountDialog(BuildContext context) async {
+    UserAccount account;
+    try {
+      account = await accountFuture!;
+    } catch (_) {
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.menu_account_card_title),
+          content: AppErrorView(
+            message: l10n.common_error_message,
+            retryLabel: l10n.common_retry,
+            onRetry: () {
+              Navigator.of(dialogContext).pop();
+              onRetry();
+            },
+          ),
+        ),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(l10n.menu_account_card_title),
         content: SizedBox(
           width: double.maxFinite,
-          child: FutureBuilder<UserAccount>(
-            future: accountFuture,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return AppErrorView(
-                  message: l10n.common_error_message,
-                  retryLabel: l10n.common_retry,
-                  onRetry: onRetry,
-                );
-              }
-              if (!snapshot.hasData) {
-                return AppLoadingView(label: l10n.common_loading);
-              }
-              final account = snapshot.data!;
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.purpleDark,
-                    child: Icon(
-                      Icons.person_rounded,
-                      color: AppColors.textPrimary,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.purpleDark,
+                child: Icon(
+                  Icons.person_rounded,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      account.name,
+                      style: Theme.of(dialogContext).textTheme.bodyLarge,
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Flexible(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          account.name,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        Text(
-                          account.email,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
+                    Text(
+                      account.email,
+                      style: Theme.of(dialogContext).textTheme.bodyMedium,
                     ),
-                  ),
-                ],
-              );
-            },
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -264,38 +278,36 @@ class _PlanCard extends StatelessWidget {
   final MenuRepository menuRepository;
   final VoidCallback onPlanChanged;
 
-  Future<void> _showComparePlansDialog(BuildContext context) {
-    return showDialog<void>(
+  // Antes chamava menuRepository.getAvailablePlans() direto no `future:` do
+  // FutureBuilder dentro do diálogo — isso buscava os dados de novo (e
+  // piscava loading) toda vez que o modal era aberto. Agora aguardamos a
+  // busca antes de abrir o diálogo, que já nasce pronto.
+  Future<void> _showComparePlansDialog(BuildContext context) async {
+    final plans = await menuRepository.getAvailablePlans();
+    if (!context.mounted) return;
+
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(l10n.menu_plan_compare_dialog_title),
         content: SizedBox(
           width: double.maxFinite,
-          child: FutureBuilder<List<PlanOption>>(
-            future: menuRepository.getAvailablePlans(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return AppLoadingView(label: l10n.common_loading);
-              }
-              final plans = snapshot.data!;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final plan in plans)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(plan.name),
-                      subtitle: Text('${plan.priceLabel}\n${plan.description}'),
-                      trailing: plan.isCurrent
-                          ? StatusBadge(
-                              status: AppStatus.connected,
-                              label: l10n.menu_plan_status_active,
-                            )
-                          : null,
-                    ),
-                ],
-              );
-            },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final plan in plans)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(plan.name),
+                  subtitle: Text('${plan.priceLabel}\n${plan.description}'),
+                  trailing: plan.isCurrent
+                      ? StatusBadge(
+                          status: AppStatus.connected,
+                          label: l10n.menu_plan_status_active,
+                        )
+                      : null,
+                ),
+            ],
           ),
         ),
         actions: [
@@ -348,40 +360,35 @@ class _PlanCard extends StatelessWidget {
     onPlanChanged();
   }
 
-  Future<void> _showPaymentHistoryDialog(BuildContext context) {
-    return showDialog<void>(
+  // Mesma correção do diálogo de comparar planos: busca antes de abrir o
+  // modal, em vez de buscar de novo (com flash de loading) a cada abertura.
+  Future<void> _showPaymentHistoryDialog(BuildContext context) async {
+    final entries = await menuRepository.getPaymentHistory();
+    if (!context.mounted) return;
+
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(l10n.menu_plan_payment_history_dialog_title),
         content: SizedBox(
           width: double.maxFinite,
-          child: FutureBuilder<List<PaymentHistoryEntry>>(
-            future: menuRepository.getPaymentHistory(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return AppLoadingView(label: l10n.common_loading);
-              }
-              final entries = snapshot.data!;
-              if (entries.isEmpty) {
-                return Text(l10n.menu_plan_payment_history_empty);
-              }
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final entry in entries)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(entry.amountLabel),
-                      subtitle: Text(entry.dateLabel),
-                      trailing: StatusBadge(
-                        status: entry.status,
-                        label: _paymentStatusLabel(entry.status),
+          child: entries.isEmpty
+              ? Text(l10n.menu_plan_payment_history_empty)
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final entry in entries)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(entry.amountLabel),
+                        subtitle: Text(entry.dateLabel),
+                        trailing: StatusBadge(
+                          status: entry.status,
+                          label: _paymentStatusLabel(entry.status),
+                        ),
                       ),
-                    ),
-                ],
-              );
-            },
-          ),
+                  ],
+                ),
         ),
         actions: [
           TextButton(
@@ -422,76 +429,74 @@ class _PlanCard extends StatelessWidget {
   /// Detalhes (preço, uso, ações) só aparecem no modal ao clicar no cartão —
   /// a barra de progresso roxa antiga saiu por ser redundante com o texto de
   /// uso logo abaixo dela.
-  Future<void> _showPlanDetailsDialog(BuildContext context) {
-    return showDialog<void>(
+  // Mesma correção: aguarda o Future (já cacheado no state da tela) antes
+  // de abrir o modal, em vez de resolver dentro de um FutureBuilder — que
+  // sempre pisca "waiting" por um frame mesmo com o Future já pronto.
+  Future<void> _showPlanDetailsDialog(BuildContext context) async {
+    if (planFuture == null) return;
+    final plan = await planFuture!;
+    if (!context.mounted) return;
+
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(l10n.menu_plan_card_title),
         content: SizedBox(
           width: double.maxFinite,
-          child: FutureBuilder<SubscriptionPlan>(
-            future: planFuture,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return AppLoadingView(label: l10n.common_loading);
-              }
-              final plan = snapshot.data!;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        plan.name,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      StatusBadge(
-                        status: plan.status,
-                        label: _statusLabel(plan.status),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
                   Text(
-                    plan.priceLabel,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    plan.name,
+                    style: Theme.of(dialogContext).textTheme.bodyLarge,
                   ),
-                  Text(
-                    l10n.menu_plan_renews_on(plan.renewalDateLabel),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.menu_plan_usage_label(
-                      plan.messagesUsed,
-                      plan.messagesLimit,
-                    ),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton(
-                        onPressed: () => _showComparePlansDialog(context),
-                        child: Text(l10n.menu_plan_compare_button),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => _showPaymentHistoryDialog(context),
-                        child: Text(l10n.menu_plan_payment_history_button),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => _showChangePlanDialog(context),
-                        child: Text(l10n.menu_plan_change_button),
-                      ),
-                    ],
+                  StatusBadge(
+                    status: plan.status,
+                    label: _statusLabel(plan.status),
                   ),
                 ],
-              );
-            },
+              ),
+              const SizedBox(height: 4),
+              Text(
+                plan.priceLabel,
+                style: Theme.of(dialogContext).textTheme.bodyMedium,
+              ),
+              Text(
+                l10n.menu_plan_renews_on(plan.renewalDateLabel),
+                style: Theme.of(dialogContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.menu_plan_usage_label(
+                  plan.messagesUsed,
+                  plan.messagesLimit,
+                ),
+                style: Theme.of(dialogContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => _showComparePlansDialog(context),
+                    child: Text(l10n.menu_plan_compare_button),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _showPaymentHistoryDialog(context),
+                    child: Text(l10n.menu_plan_payment_history_button),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _showChangePlanDialog(context),
+                    child: Text(l10n.menu_plan_change_button),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
         actions: [
@@ -800,51 +805,48 @@ class _AboutCard extends StatelessWidget {
 
   /// Versão/descrição/status só aparecem dentro do modal, ao clicar em
   /// "Sobre".
-  Future<void> _showAboutDialog(BuildContext context) {
-    return showDialog<void>(
+  // Mesma correção: aguarda o Future cacheado antes de abrir o modal, em
+  // vez de deixar o FutureBuilder piscar "waiting" por um frame.
+  Future<void> _showAboutDialog(BuildContext context) async {
+    if (appInfoFuture == null) return;
+    final info = await appInfoFuture!;
+    if (!context.mounted) return;
+
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(l10n.menu_about_card_title),
         content: SizedBox(
           width: double.maxFinite,
-          child: FutureBuilder<AppInfo>(
-            future: appInfoFuture,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return AppLoadingView(label: l10n.common_loading);
-              }
-              final info = snapshot.data!;
-              return Column(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.menu_about_version_label(info.version),
+                style: Theme.of(dialogContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.menu_about_app_description,
+                style: Theme.of(dialogContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Row(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    l10n.menu_about_version_label(info.version),
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    l10n.menu_about_service_status_label,
+                    style: Theme.of(dialogContext).textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.menu_about_app_description,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        l10n.menu_about_service_status_label,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(width: 8),
-                      StatusBadge(
-                        status: info.serviceStatus,
-                        label: _serviceStatusLabel(info.serviceStatus),
-                      ),
-                    ],
+                  const SizedBox(width: 8),
+                  StatusBadge(
+                    status: info.serviceStatus,
+                    label: _serviceStatusLabel(info.serviceStatus),
                   ),
                 ],
-              );
-            },
+              ),
+            ],
           ),
         ),
         actions: [

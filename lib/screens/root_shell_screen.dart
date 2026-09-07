@@ -70,17 +70,16 @@ class _RootShellScreenState extends State<RootShellScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(_titleFor(l10n))),
-      // Troca de aba com fade suave (Etapa 8, README.md seção 13) em vez de
-      // corte seco entre Início / Mensagens / Menu.
+      // IndexedStack (em vez do AnimatedSwitcher+KeyedSubtree antigo) mantém
+      // as 3 telas vivas simultaneamente, só trocando qual fica visível.
+      // Antes, cada troca de aba destruía e recriava a tela (KeyedSubtree
+      // com key por índice), fazendo Início/Menu refazerem suas buscas
+      // assíncronas (stats, conta, plano) do zero e piscar um loading
+      // rápido sempre que o usuário voltava pra uma aba já visitada.
       body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child: KeyedSubtree(
-            key: ValueKey<int>(_navIndex),
-            child: pages[_navIndex],
-          ),
+        child: IndexedStack(
+          index: _navIndex,
+          children: pages,
         ),
       ),
       bottomNavigationBar: ZaBotBottomNav(
