@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fundo da tela de abertura nativa (antes do primeiro frame do
+         Flutter), igual ao AppColors.background do app (ver README.md,
+         seção 14 / lib/theme/app_theme.dart). -->
+    <color name="splash_background">#FF121016</color>
+</resources>

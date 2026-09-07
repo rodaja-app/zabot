@@ -1,0 +1,810 @@
+{
+  "@@locale": "pt",
+
+  "app_title": "ZaBot",
+  "@app_title": {
+    "description": "Nome do aplicativo, exibido no título/splash"
+  },
+
+  "common_loading": "Carregando...",
+  "@common_loading": {
+    "description": "Texto genérico de carregamento"
+  },
+
+  "common_retry": "Tentar novamente",
+  "@common_retry": {
+    "description": "Botão genérico de nova tentativa em telas de erro"
+  },
+
+  "common_error_message": "Não foi possível carregar os dados. Tente novamente.",
+  "@common_error_message": {
+    "description": "Mensagem genérica exibida em estados de erro (Etapa 7)"
+  },
+
+  "common_save": "Salvar",
+  "@common_save": {
+    "description": "Botão genérico de salvar em diálogos"
+  },
+
+  "common_cancel": "Cancelar",
+  "@common_cancel": {
+    "description": "Botão genérico de cancelar em diálogos"
+  },
+
+  "nav_home": "Início",
+  "@nav_home": {
+    "description": "Rótulo da aba Início na navegação inferior"
+  },
+
+  "nav_messages": "Mensagens",
+  "@nav_messages": {
+    "description": "Rótulo da aba Mensagens na navegação inferior"
+  },
+
+  "nav_menu": "Menu",
+  "@nav_menu": {
+    "description": "Rótulo da aba Menu na navegação inferior"
+  },
+
+  "auth_cadastro_title": "Criar conta",
+  "@auth_cadastro_title": {
+    "description": "Título da tela de Cadastro"
+  },
+  "auth_cadastro_name_label": "Nome",
+  "@auth_cadastro_name_label": {
+    "description": "Rótulo do campo Nome no Cadastro"
+  },
+  "auth_cadastro_email_label": "Email",
+  "@auth_cadastro_email_label": {
+    "description": "Rótulo do campo Email no Cadastro"
+  },
+  "auth_cadastro_password_label": "Senha",
+  "@auth_cadastro_password_label": {
+    "description": "Rótulo do campo Senha no Cadastro"
+  },
+  "auth_cadastro_confirm_password_label": "Confirmar senha",
+  "@auth_cadastro_confirm_password_label": {
+    "description": "Rótulo do campo Confirmar senha no Cadastro"
+  },
+  "auth_cadastro_password_mismatch_error": "As senhas não coincidem",
+  "@auth_cadastro_password_mismatch_error": {
+    "description": "Erro exibido quando Senha e Confirmar senha são diferentes"
+  },
+  "auth_cadastro_submit_button": "Cadastrar",
+  "@auth_cadastro_submit_button": {
+    "description": "Botão de envio do formulário de Cadastro"
+  },
+  "auth_cadastro_login_link": "Já tem uma conta? Entrar",
+  "@auth_cadastro_login_link": {
+    "description": "Link no Cadastro que leva à tela de Login"
+  },
+
+  "auth_codigo_title": "Confirme seu email",
+  "@auth_codigo_title": {
+    "description": "Título da tela de Confirmação de código"
+  },
+  "auth_codigo_subtitle": "Enviamos um código de confirmação para {email}.",
+  "@auth_codigo_subtitle": {
+    "description": "Subtítulo da tela de Confirmação de código, mostrando o email de destino",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "auth_codigo_label": "Código de confirmação",
+  "@auth_codigo_label": {
+    "description": "Rótulo do campo de código na tela de Confirmação"
+  },
+  "auth_codigo_invalid_error": "Código inválido. Tente novamente.",
+  "@auth_codigo_invalid_error": {
+    "description": "Erro exibido quando o código digitado está incorreto"
+  },
+  "auth_codigo_confirm_button": "Confirmar",
+  "@auth_codigo_confirm_button": {
+    "description": "Botão de confirmação do código"
+  },
+  "auth_codigo_resend_link": "Reenviar código",
+  "@auth_codigo_resend_link": {
+    "description": "Link para reenviar o código de confirmação por email"
+  },
+  "auth_codigo_success_message": "Conta confirmada!",
+  "@auth_codigo_success_message": {
+    "description": "Mensagem exibida por instantes após o código ser confirmado com sucesso, antes de entrar no app"
+  },
+
+  "auth_login_title": "Entrar",
+  "@auth_login_title": {
+    "description": "Título da tela de Login"
+  },
+  "auth_login_email_label": "Email",
+  "@auth_login_email_label": {
+    "description": "Rótulo do campo Email no Login"
+  },
+  "auth_login_password_label": "Senha",
+  "@auth_login_password_label": {
+    "description": "Rótulo do campo Senha no Login"
+  },
+  "auth_login_submit_button": "Entrar",
+  "@auth_login_submit_button": {
+    "description": "Botão de envio do formulário de Login"
+  },
+  "auth_login_invalid_error": "Email ou senha inválidos",
+  "@auth_login_invalid_error": {
+    "description": "Erro exibido quando as credenciais de Login estão incorretas"
+  },
+  "auth_login_signup_link": "Não tem conta? Cadastre-se",
+  "@auth_login_signup_link": {
+    "description": "Link no Login que leva à tela de Cadastro"
+  },
+
+  "home_connection_card_title": "Conexão com o WhatsApp",
+  "@home_connection_card_title": {
+    "description": "Título do card de conexão na Tela Início"
+  },
+  "home_connection_status_connected": "Conectado",
+  "@home_connection_status_connected": {
+    "description": "Rótulo do badge de status quando o WhatsApp está conectado"
+  },
+  "home_connection_status_connecting": "Conectando",
+  "@home_connection_status_connecting": {
+    "description": "Rótulo do badge de status durante a conexão (QR code)"
+  },
+  "home_connection_status_disconnected": "Desconectado",
+  "@home_connection_status_disconnected": {
+    "description": "Rótulo do badge de status quando o WhatsApp está desconectado"
+  },
+  "home_connection_connected_description": "Seu WhatsApp está conectado e pronto para enviar mensagens.",
+  "@home_connection_connected_description": {
+    "description": "Texto do card de conexão quando conectado"
+  },
+  "home_connection_disconnected_description": "Conecte seu WhatsApp para começar a enviar mensagens em massa.",
+  "@home_connection_disconnected_description": {
+    "description": "Texto do card de conexão quando desconectado"
+  },
+  "home_connection_connecting_phone_description": "Aguardando confirmação no WhatsApp do número informado...",
+  "@home_connection_connecting_phone_description": {
+    "description": "Texto do card de conexão durante o fluxo de conexão por número de telefone"
+  },
+  "home_connection_qr_instructions": "Abra o WhatsApp no celular, toque em Aparelhos conectados e escaneie o código acima.",
+  "@home_connection_qr_instructions": {
+    "description": "Instruções exibidas durante o fluxo de QR code"
+  },
+  "home_connection_connect_button": "Conectar WhatsApp",
+  "@home_connection_connect_button": {
+    "description": "Botão para iniciar a conexão do WhatsApp"
+  },
+  "home_connection_disconnect_button": "Desconectar",
+  "@home_connection_disconnect_button": {
+    "description": "Botão para desconectar o WhatsApp já conectado"
+  },
+  "home_connection_cancel_button": "Cancelar",
+  "@home_connection_cancel_button": {
+    "description": "Botão para cancelar o fluxo de conexão em andamento"
+  },
+  "home_connection_session_name_label": "Nome da sessão",
+  "@home_connection_session_name_label": {
+    "description": "Rótulo acima do nome da sessão, quando conectado"
+  },
+  "home_connection_manage_button": "Gerenciar conexão",
+  "@home_connection_manage_button": {
+    "description": "Botão que abre as opções de gerenciamento da conexão, quando conectado"
+  },
+  "home_connection_manage_sheet_title": "Gerenciar conexão",
+  "@home_connection_manage_sheet_title": {
+    "description": "Título do menu de opções de \"Gerenciar conexão\""
+  },
+  "home_connection_manage_rename_option": "Alterar nome da sessão",
+  "@home_connection_manage_rename_option": {
+    "description": "Opção do menu \"Gerenciar conexão\" para renomear a sessão"
+  },
+  "home_connection_manage_disconnect_option": "Desconectar WhatsApp",
+  "@home_connection_manage_disconnect_option": {
+    "description": "Opção do menu \"Gerenciar conexão\" para desconectar"
+  },
+  "home_connection_manage_reconnect_option": "Reconectar WhatsApp",
+  "@home_connection_manage_reconnect_option": {
+    "description": "Opção do menu \"Gerenciar conexão\" para desconectar e conectar de novo"
+  },
+  "home_connection_connect_sheet_title": "Conectar WhatsApp",
+  "@home_connection_connect_sheet_title": {
+    "description": "Título do menu de opções para iniciar a conexão"
+  },
+  "home_connection_connect_option_qr": "QR Code",
+  "@home_connection_connect_option_qr": {
+    "description": "Opção de conectar escaneando um QR Code"
+  },
+  "home_connection_connect_option_phone": "Número de telefone",
+  "@home_connection_connect_option_phone": {
+    "description": "Opção de conectar informando o número de telefone"
+  },
+  "home_connection_rename_dialog_title": "Alterar nome da sessão",
+  "@home_connection_rename_dialog_title": {
+    "description": "Título do diálogo de renomear a sessão"
+  },
+  "home_connection_rename_dialog_label": "Nome da sessão",
+  "@home_connection_rename_dialog_label": {
+    "description": "Rótulo do campo de texto do diálogo de renomear a sessão"
+  },
+  "home_connection_phone_dialog_title": "Conectar por número de telefone",
+  "@home_connection_phone_dialog_title": {
+    "description": "Título do diálogo de conectar por número de telefone"
+  },
+  "home_connection_phone_dialog_label": "Número de telefone",
+  "@home_connection_phone_dialog_label": {
+    "description": "Rótulo do campo de texto do diálogo de conectar por número de telefone"
+  },
+  "home_connection_phone_dialog_instructions": "Você vai receber um código no WhatsApp desse número para confirmar a conexão.",
+  "@home_connection_phone_dialog_instructions": {
+    "description": "Instruções exibidas no diálogo de conectar por número de telefone"
+  },
+  "home_stats_card_title": "Resumo",
+  "@home_stats_card_title": {
+    "description": "Título do card de resumo/estatísticas na Tela Início"
+  },
+  "home_stats_contacts_imported_label": "Contatos importados",
+  "@home_stats_contacts_imported_label": {
+    "description": "Rótulo do número de contatos importados"
+  },
+  "home_stats_messages_sent_label": "Mensagens enviadas",
+  "@home_stats_messages_sent_label": {
+    "description": "Rótulo do número de mensagens enviadas"
+  },
+  "home_stats_messages_pending_label": "Mensagens pendentes",
+  "@home_stats_messages_pending_label": {
+    "description": "Rótulo do número de mensagens pendentes de envio"
+  },
+  "home_stats_failures_label": "Falhas",
+  "@home_stats_failures_label": {
+    "description": "Rótulo do número de mensagens que falharam"
+  },
+  "home_stats_total_messages_label": "Total de mensagens",
+  "@home_stats_total_messages_label": {
+    "description": "Rótulo do total de mensagens (enviadas + pendentes + falhas)"
+  },
+
+  "messages_tab_campaigns": "Campanhas",
+  "@messages_tab_campaigns": {
+    "description": "Aba de campanhas na Tela Mensagens"
+  },
+  "messages_tab_contacts": "Contatos",
+  "@messages_tab_contacts": {
+    "description": "Aba de contatos na Tela Mensagens"
+  },
+  "messages_campaigns_new_button": "Nova campanha",
+  "@messages_campaigns_new_button": {
+    "description": "Botão para iniciar a criação de uma nova campanha"
+  },
+  "messages_campaigns_empty": "Nenhuma campanha ainda",
+  "@messages_campaigns_empty": {
+    "description": "Texto exibido quando não há campanhas"
+  },
+  "messages_campaign_recipients_count": "{count, plural, one{{count} destinatário} other{{count} destinatários}}",
+  "@messages_campaign_recipients_count": {
+    "description": "Contagem de destinatários de uma campanha",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_status_sent_label": "Enviada",
+  "@messages_status_sent_label": {
+    "description": "Rótulo de status de campanha enviada com sucesso"
+  },
+  "messages_status_failed_label": "Falhou",
+  "@messages_status_failed_label": {
+    "description": "Rótulo de status de campanha que falhou ao enviar"
+  },
+  "messages_status_pending_label": "Enviando",
+  "@messages_status_pending_label": {
+    "description": "Rótulo de status de campanha em andamento/pendente"
+  },
+  "messages_campaign_sent_count_label": "Enviados",
+  "@messages_campaign_sent_count_label": {
+    "description": "Rótulo do contador de mensagens enviadas no card de campanha"
+  },
+  "messages_campaign_pending_count_label": "Pendentes",
+  "@messages_campaign_pending_count_label": {
+    "description": "Rótulo do contador de mensagens pendentes no card de campanha"
+  },
+  "messages_campaign_failed_count_label": "Falhas",
+  "@messages_campaign_failed_count_label": {
+    "description": "Rótulo do contador de mensagens que falharam no card de campanha"
+  },
+  "messages_campaign_total_count_label": "Total",
+  "@messages_campaign_total_count_label": {
+    "description": "Rótulo do contador total de mensagens no card de campanha"
+  },
+  "messages_campaign_failed_summary": "{count, plural, one{{count} falha no envio} other{{count} falhas no envio}}",
+  "@messages_campaign_failed_summary": {
+    "description": "Resumo de falhas exibido em campanhas já concluídas com falhas",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_campaigns_view_sent_button": "Ver campanhas enviadas ({count})",
+  "@messages_campaigns_view_sent_button": {
+    "description": "Botão que abre a tela de campanhas já enviadas, com a contagem entre parênteses",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_sent_campaigns_title": "Campanhas enviadas",
+  "@messages_sent_campaigns_title": {
+    "description": "Título da tela que lista as campanhas já enviadas"
+  },
+  "messages_sent_campaigns_empty": "Nenhuma campanha enviada ainda",
+  "@messages_sent_campaigns_empty": {
+    "description": "Texto exibido quando não há campanhas enviadas"
+  },
+  "messages_campaigns_clear_history_button": "Limpar histórico de envio",
+  "@messages_campaigns_clear_history_button": {
+    "description": "Botão destrutivo que apaga todo o histórico de campanhas (enviadas, pendentes e falhas)"
+  },
+  "messages_campaigns_clear_history_confirm_title": "Limpar histórico de envio?",
+  "@messages_campaigns_clear_history_confirm_title": {
+    "description": "Título do diálogo de confirmação antes de limpar o histórico de campanhas"
+  },
+  "messages_campaigns_clear_history_confirm_message": "Isso vai apagar todas as campanhas enviadas, pendentes e com falha. Essa ação não pode ser desfeita.",
+  "@messages_campaigns_clear_history_confirm_message": {
+    "description": "Mensagem de aviso do diálogo de confirmação de limpeza de histórico"
+  },
+  "messages_campaigns_clear_history_confirm_button": "Limpar tudo",
+  "@messages_campaigns_clear_history_confirm_button": {
+    "description": "Botão de confirmação final da limpeza de histórico"
+  },
+  "messages_campaigns_clear_history_success": "Histórico de envio limpo.",
+  "@messages_campaigns_clear_history_success": {
+    "description": "Snackbar exibida após limpar o histórico de campanhas com sucesso"
+  },
+  "messages_contacts_import_button": "Importar contatos",
+  "@messages_contacts_import_button": {
+    "description": "Botão para importar novos contatos"
+  },
+  "messages_contacts_search_hint": "Buscar contato",
+  "@messages_contacts_search_hint": {
+    "description": "Rótulo do campo de busca de contatos"
+  },
+  "messages_contacts_empty": "Nenhum contato encontrado",
+  "@messages_contacts_empty": {
+    "description": "Texto exibido quando a lista de contatos está vazia"
+  },
+  "messages_contacts_import_dialog_title": "Importar contatos",
+  "@messages_contacts_import_dialog_title": {
+    "description": "Título do diálogo de importação de contatos"
+  },
+  "messages_contacts_import_mode_prompt": "Escolha como deseja adicionar contatos:",
+  "@messages_contacts_import_mode_prompt": {
+    "description": "Texto de introdução perguntando o modo de importação"
+  },
+  "messages_contacts_import_mode_paste_title": "Colar lista",
+  "@messages_contacts_import_mode_paste_title": {
+    "description": "Opção de importar colando vários contatos de uma vez"
+  },
+  "messages_contacts_import_mode_paste_description": "Cole vários contatos de uma vez, um por linha.",
+  "@messages_contacts_import_mode_paste_description": {
+    "description": "Descrição da opção de colar lista de contatos"
+  },
+  "messages_contacts_import_mode_manual_title": "Adicionar um por um",
+  "@messages_contacts_import_mode_manual_title": {
+    "description": "Opção de cadastrar um contato individualmente"
+  },
+  "messages_contacts_import_mode_manual_description": "Cadastre um contato individualmente, com campos personalizados.",
+  "@messages_contacts_import_mode_manual_description": {
+    "description": "Descrição da opção de adicionar contato individualmente"
+  },
+  "messages_contacts_manual_submit_button": "Adicionar contato",
+  "@messages_contacts_manual_submit_button": {
+    "description": "Botão de confirmação do cadastro manual de contato"
+  },
+  "messages_contacts_import_hint": "Cole a lista de contatos",
+  "@messages_contacts_import_hint": {
+    "description": "Rótulo do campo de colar a lista de contatos"
+  },
+  "messages_contacts_import_helper": "Um contato por linha, com código do país (ex: +5511999999999). Opcional: adicione dados separados por vírgula para ID1, ID2, ID3...",
+  "@messages_contacts_import_helper": {
+    "description": "Texto de ajuda explicando o formato esperado para colar os contatos"
+  },
+  "messages_contacts_import_submit_button": "Importar",
+  "@messages_contacts_import_submit_button": {
+    "description": "Botão de confirmação do diálogo de importação de contatos"
+  },
+  "messages_contacts_import_result": "{imported, plural, one{{imported} contato importado} other{{imported} contatos importados}}",
+  "@messages_contacts_import_result": {
+    "description": "Resultado da importação quando não há linhas inválidas",
+    "placeholders": {
+      "imported": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_contacts_import_result_with_skipped": "{imported, plural, one{{imported} contato importado} other{{imported} contatos importados}}, {skipped, plural, one{{skipped} linha ignorada} other{{skipped} linhas ignoradas}}",
+  "@messages_contacts_import_result_with_skipped": {
+    "description": "Resultado da importação quando há linhas inválidas ignoradas",
+    "placeholders": {
+      "imported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_contacts_edit_dialog_title": "Editar contato",
+  "@messages_contacts_edit_dialog_title": {
+    "description": "Título do diálogo de edição de contato"
+  },
+  "messages_contacts_phone_label": "Telefone",
+  "@messages_contacts_phone_label": {
+    "description": "Rótulo do campo de telefone no diálogo de edição de contato"
+  },
+  "messages_contacts_add_field_button": "Adicionar campo",
+  "@messages_contacts_add_field_button": {
+    "description": "Botão para adicionar um novo campo de personalização (ID) ao contato"
+  },
+  "common_remove": "Remover",
+  "@common_remove": {
+    "description": "Botão genérico de remover em diálogos"
+  },
+  "messages_nova_campanha_title": "Nova campanha",
+  "@messages_nova_campanha_title": {
+    "description": "Título da tela de criação de campanha"
+  },
+  "messages_nova_campanha_messages_section_title": "Mensagens",
+  "@messages_nova_campanha_messages_section_title": {
+    "description": "Título da seção de composição das mensagens da campanha"
+  },
+  "messages_nova_campanha_max_messages_hint": "Você pode adicionar até 5 mensagens diferentes; elas serão intercaladas entre os contatos.",
+  "@messages_nova_campanha_max_messages_hint": {
+    "description": "Texto explicando o limite de 5 mensagens por campanha"
+  },
+  "messages_nova_campanha_message_field_label": "Mensagem {index}",
+  "@messages_nova_campanha_message_field_label": {
+    "description": "Rótulo de cada campo de mensagem, numerado",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_nova_campanha_bold_tooltip": "Negrito",
+  "@messages_nova_campanha_bold_tooltip": {
+    "description": "Dica do botão de aplicar negrito no texto selecionado"
+  },
+  "messages_nova_campanha_italic_tooltip": "Itálico",
+  "@messages_nova_campanha_italic_tooltip": {
+    "description": "Dica do botão de aplicar itálico no texto selecionado"
+  },
+  "messages_nova_campanha_emoji_tooltip": "Emoji",
+  "@messages_nova_campanha_emoji_tooltip": {
+    "description": "Dica do botão de abrir o seletor de emojis"
+  },
+  "messages_nova_campanha_remove_message_tooltip": "Remover mensagem",
+  "@messages_nova_campanha_remove_message_tooltip": {
+    "description": "Dica do botão de remover um campo de mensagem"
+  },
+  "messages_nova_campanha_add_message_button": "Adicionar mensagem",
+  "@messages_nova_campanha_add_message_button": {
+    "description": "Botão para adicionar outro campo de mensagem"
+  },
+  "messages_nova_campanha_personalization_section_title": "Personalização",
+  "@messages_nova_campanha_personalization_section_title": {
+    "description": "Título da seção de personalização por IDs"
+  },
+  "messages_nova_campanha_personalization_empty": "Nenhum dado de personalização disponível nos contatos importados.",
+  "@messages_nova_campanha_personalization_empty": {
+    "description": "Texto exibido quando nenhum contato tem campos de personalização (ID1, ID2...)"
+  },
+  "messages_nova_campanha_personalization_hint": "Toque em um dos campos abaixo para inserir na mensagem selecionada.",
+  "@messages_nova_campanha_personalization_hint": {
+    "description": "Texto explicando como usar os chips de personalização"
+  },
+  "messages_nova_campanha_media_section_title": "Mídia (opcional)",
+  "@messages_nova_campanha_media_section_title": {
+    "description": "Título da seção de seleção de mídia"
+  },
+  "messages_nova_campanha_media_images_option": "Imagem",
+  "@messages_nova_campanha_media_images_option": {
+    "description": "Opção de mídia: imagem(ns)"
+  },
+  "messages_nova_campanha_media_images_count_label": "{count, plural, one{{count} imagem anexada} other{{count} imagens anexadas}}",
+  "@messages_nova_campanha_media_images_count_label": {
+    "description": "Contagem de imagens anexadas à campanha",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_nova_campanha_media_document": "Documento",
+  "@messages_nova_campanha_media_document": {
+    "description": "Opção de mídia: documento"
+  },
+  "messages_nova_campanha_media_audio": "Áudio",
+  "@messages_nova_campanha_media_audio": {
+    "description": "Opção de mídia: áudio"
+  },
+  "messages_nova_campanha_interval_section_title": "Intervalo de envio",
+  "@messages_nova_campanha_interval_section_title": {
+    "description": "Título da seção de intervalo aleatório entre envios"
+  },
+  "messages_nova_campanha_interval_hint": "Cada mensagem será enviada em um tempo aleatório dentro do intervalo definido, para simular um envio mais natural.",
+  "@messages_nova_campanha_interval_hint": {
+    "description": "Texto explicando o intervalo aleatório entre envios"
+  },
+  "messages_nova_campanha_interval_min_label": "Mínimo",
+  "@messages_nova_campanha_interval_min_label": {
+    "description": "Rótulo do contador de intervalo mínimo, em minutos"
+  },
+  "messages_nova_campanha_interval_max_label": "Máximo",
+  "@messages_nova_campanha_interval_max_label": {
+    "description": "Rótulo do contador de intervalo máximo, em minutos"
+  },
+  "messages_nova_campanha_interval_minutes_value": "{value} min",
+  "@messages_nova_campanha_interval_minutes_value": {
+    "description": "Valor do contador de intervalo, em minutos",
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_nova_campanha_send_section_title": "Enviar",
+  "@messages_nova_campanha_send_section_title": {
+    "description": "Título da seção de envio da campanha"
+  },
+  "messages_nova_campanha_no_contacts_warning": "Importe contatos na aba Contatos antes de iniciar o envio.",
+  "@messages_nova_campanha_no_contacts_warning": {
+    "description": "Aviso exibido quando não há contatos importados, bloqueando o envio"
+  },
+  "messages_nova_campanha_recipients_all_option": "Todos os contatos",
+  "@messages_nova_campanha_recipients_all_option": {
+    "description": "Opção de enviar para todos os contatos importados"
+  },
+  "messages_nova_campanha_recipients_manual_option": "Selecionar contatos",
+  "@messages_nova_campanha_recipients_manual_option": {
+    "description": "Opção de escolher manualmente os contatos que vão receber o envio"
+  },
+  "messages_nova_campanha_recipients_select_button": "Selecionar contatos",
+  "@messages_nova_campanha_recipients_select_button": {
+    "description": "Botão que abre o modal de seleção manual de contatos"
+  },
+  "messages_nova_campanha_recipients_edit_selection_button": "{count, plural, one{{count} contato selecionado} other{{count} contatos selecionados}}",
+  "@messages_nova_campanha_recipients_edit_selection_button": {
+    "description": "Botão que reabre o modal de seleção, mostrando quantos contatos já foram escolhidos",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_nova_campanha_recipients_none_selected_warning": "Selecione ao menos um contato para continuar.",
+  "@messages_nova_campanha_recipients_none_selected_warning": {
+    "description": "Aviso exibido quando o modo de seleção manual está ativo mas nenhum contato foi escolhido"
+  },
+  "messages_nova_campanha_recipients_dialog_title": "Selecionar contatos",
+  "@messages_nova_campanha_recipients_dialog_title": {
+    "description": "Título do modal de seleção manual de contatos"
+  },
+  "messages_nova_campanha_recipients_dialog_select_all": "Selecionar todos",
+  "@messages_nova_campanha_recipients_dialog_select_all": {
+    "description": "Botão para marcar todos os contatos filtrados no modal de seleção"
+  },
+  "messages_nova_campanha_recipients_dialog_clear_all": "Limpar seleção",
+  "@messages_nova_campanha_recipients_dialog_clear_all": {
+    "description": "Botão para desmarcar todos os contatos selecionados no modal de seleção"
+  },
+  "messages_nova_campanha_recipients_dialog_confirm_button": "Confirmar ({count})",
+  "@messages_nova_campanha_recipients_dialog_confirm_button": {
+    "description": "Botão de confirmação da seleção manual de contatos, com a contagem selecionada",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "messages_nova_campanha_submit_button": "Iniciar envio",
+  "@messages_nova_campanha_submit_button": {
+    "description": "Botão para iniciar o envio da campanha"
+  },
+
+  "menu_account_card_title": "Minha conta",
+  "@menu_account_card_title": {
+    "description": "Título do card de conta na Tela Menu"
+  },
+  "menu_account_logout_button": "Sair",
+  "@menu_account_logout_button": {
+    "description": "Botão de logout na Tela Menu"
+  },
+  "menu_plan_card_title": "Plano e assinatura",
+  "@menu_plan_card_title": {
+    "description": "Título do card de plano/assinatura na Tela Menu"
+  },
+  "menu_plan_status_active": "Ativo",
+  "@menu_plan_status_active": {
+    "description": "Rótulo de status quando o plano está ativo"
+  },
+  "menu_plan_status_trial": "Período de teste",
+  "@menu_plan_status_trial": {
+    "description": "Rótulo de status quando o plano está em período de teste"
+  },
+  "menu_plan_status_expired": "Expirado",
+  "@menu_plan_status_expired": {
+    "description": "Rótulo de status quando o plano expirou"
+  },
+  "menu_plan_renews_on": "Renova em {date}",
+  "@menu_plan_renews_on": {
+    "description": "Data da próxima renovação do plano",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "menu_plan_usage_label": "{used} de {limit} mensagens usadas este mês",
+  "@menu_plan_usage_label": {
+    "description": "Uso de mensagens do plano no mês corrente",
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "menu_plan_compare_button": "Comparar planos",
+  "@menu_plan_compare_button": {
+    "description": "Botão que abre o diálogo de comparação de planos"
+  },
+  "menu_plan_change_button": "Assinar/alterar plano",
+  "@menu_plan_change_button": {
+    "description": "Botão que abre o diálogo de troca de plano"
+  },
+  "menu_plan_payment_history_button": "Histórico de pagamentos",
+  "@menu_plan_payment_history_button": {
+    "description": "Botão que abre o diálogo de histórico de pagamentos"
+  },
+  "menu_plan_compare_dialog_title": "Comparar planos",
+  "@menu_plan_compare_dialog_title": {
+    "description": "Título do diálogo de comparação de planos"
+  },
+  "menu_plan_change_dialog_title": "Assinar/alterar plano",
+  "@menu_plan_change_dialog_title": {
+    "description": "Título do diálogo de escolha de novo plano"
+  },
+  "menu_plan_payment_history_dialog_title": "Histórico de pagamentos",
+  "@menu_plan_payment_history_dialog_title": {
+    "description": "Título do diálogo de histórico de pagamentos"
+  },
+  "menu_plan_payment_history_empty": "Nenhum pagamento registrado ainda.",
+  "@menu_plan_payment_history_empty": {
+    "description": "Mensagem quando não há pagamentos no histórico"
+  },
+  "menu_plan_payment_status_paid": "Pago",
+  "@menu_plan_payment_status_paid": {
+    "description": "Rótulo de status de um pagamento concluído"
+  },
+  "menu_plan_payment_status_pending": "Pendente",
+  "@menu_plan_payment_status_pending": {
+    "description": "Rótulo de status de um pagamento pendente"
+  },
+  "menu_plan_payment_status_failed": "Recusado",
+  "@menu_plan_payment_status_failed": {
+    "description": "Rótulo de status de um pagamento recusado"
+  },
+  "menu_settings_card_title": "Configurações",
+  "@menu_settings_card_title": {
+    "description": "Título do card de configurações na Tela Menu"
+  },
+  "menu_settings_notifications_label": "Notificações",
+  "@menu_settings_notifications_label": {
+    "description": "Rótulo do switch de notificações"
+  },
+  "menu_settings_sound_label": "Som",
+  "@menu_settings_sound_label": {
+    "description": "Rótulo do switch de som"
+  },
+  "menu_connections_card_title": "Conexão do WhatsApp",
+  "@menu_connections_card_title": {
+    "description": "Título do card de conexões na Tela Menu"
+  },
+
+  "menu_support_card_title": "Suporte",
+  "@menu_support_card_title": {
+    "description": "Título do card de suporte na Tela Menu"
+  },
+  "menu_support_email_address": "suporte@zabot.com.br",
+  "@menu_support_email_address": {
+    "description": "Endereço de e-mail de suporte exibido na Tela Menu"
+  },
+  "menu_support_copy_tooltip": "Copiar e-mail",
+  "@menu_support_copy_tooltip": {
+    "description": "Tooltip do botão que copia o e-mail de suporte"
+  },
+  "menu_support_email_copied": "E-mail copiado",
+  "@menu_support_email_copied": {
+    "description": "Mensagem exibida após copiar o e-mail de suporte"
+  },
+
+  "menu_legal_card_title": "Termos e Privacidade",
+  "@menu_legal_card_title": {
+    "description": "Título do card de termos e privacidade na Tela Menu"
+  },
+  "menu_legal_terms_label": "Termos de Uso",
+  "@menu_legal_terms_label": {
+    "description": "Item que abre os Termos de Uso"
+  },
+  "menu_legal_terms_body": "Ao usar o ZaBot, você concorda em utilizar a plataforma apenas para o envio de mensagens a contatos que consentiram em recebê-las, respeitando as políticas do WhatsApp e a legislação aplicável. O uso indevido pode resultar em suspensão da conta.",
+  "@menu_legal_terms_body": {
+    "description": "Texto placeholder dos Termos de Uso"
+  },
+  "menu_legal_privacy_label": "Política de Privacidade",
+  "@menu_legal_privacy_label": {
+    "description": "Item que abre a Política de Privacidade"
+  },
+  "menu_legal_privacy_body": "O ZaBot armazena apenas os dados necessários para o funcionamento do serviço, como contatos importados e mensagens configuradas. Nenhum dado é compartilhado com terceiros sem consentimento do usuário.",
+  "@menu_legal_privacy_body": {
+    "description": "Texto placeholder da Política de Privacidade"
+  },
+
+  "menu_about_card_title": "Sobre",
+  "@menu_about_card_title": {
+    "description": "Título do card de informações do app na Tela Menu"
+  },
+  "menu_about_version_label": "Versão {version}",
+  "@menu_about_version_label": {
+    "description": "Versão do aplicativo exibida no card Sobre",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "menu_about_app_description": "ZaBot é um app de disparo em massa via WhatsApp com sessões, contatos inteligentes e campanhas.",
+  "@menu_about_app_description": {
+    "description": "Descrição curta do app exibida no card Sobre"
+  },
+  "menu_about_service_status_label": "Status do serviço:",
+  "@menu_about_service_status_label": {
+    "description": "Rótulo antes do badge de status do serviço"
+  },
+  "menu_about_service_status_operational": "Operacional",
+  "@menu_about_service_status_operational": {
+    "description": "Status do serviço quando tudo está funcionando normalmente"
+  },
+  "menu_about_service_status_degraded": "Degradado",
+  "@menu_about_service_status_degraded": {
+    "description": "Status do serviço quando há instabilidade parcial"
+  },
+  "menu_about_service_status_down": "Fora do ar",
+  "@menu_about_service_status_down": {
+    "description": "Status do serviço quando está indisponível"
+  },
+
+  "menu_danger_card_title": "Conta",
+  "@menu_danger_card_title": {
+    "description": "Título do card de ações sensíveis de conta na Tela Menu"
+  },
+  "menu_danger_delete_account_button": "Excluir conta",
+  "@menu_danger_delete_account_button": {
+    "description": "Botão que inicia a exclusão da conta"
+  },
+  "menu_danger_delete_confirm_title": "Excluir conta",
+  "@menu_danger_delete_confirm_title": {
+    "description": "Título do diálogo de confirmação de exclusão de conta"
+  },
+  "menu_danger_delete_confirm_message": "Essa ação é permanente e não pode ser desfeita. Todos os seus dados, contatos e campanhas serão apagados. Deseja continuar?",
+  "@menu_danger_delete_confirm_message": {
+    "description": "Mensagem do diálogo de confirmação de exclusão de conta"
+  },
+  "menu_danger_delete_confirm_button": "Excluir",
+  "@menu_danger_delete_confirm_button": {
+    "description": "Botão de confirmação final da exclusão de conta"
+  }
+}
