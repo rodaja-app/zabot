@@ -1,0 +1,84 @@
+name: backend-ci
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: zabot
+          POSTGRES_PASSWORD: zabot
+          POSTGRES_DB: zabot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U zabot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://zabot:zabot@localhost:5432/zabot_test
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-access-secret-nao-usar-em-producao
+      JWT_REFRESH_SECRET: ci-refresh-secret-nao-usar-em-producao
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - run: npm run lint
+
+      - run: npm test -- --ci
+
+      # test:e2e (abaixo) sobe o AppModule de verdade contra o Postgres de
+      # serviço acima — precisa das tabelas + policies de RLS aplicadas
+      # antes, senão toda rota que usa withTenantContext falha (tabela não
+      # existe / policy ausente). Mesmos 2 passos do setup local (README
+      # backend "Como rodar"), só que contra zabot_test em vez de zabot.
+      - run: npx prisma migrate deploy
+
+      - run: |
+          for f in prisma/rls/*.sql; do
+            echo "Aplicando $f"
+            npx prisma db execute --file "$f" --schema prisma/schema.prisma
+          done
+
+      - run: npm run test:e2e -- --ci
+
+      - run: npm run build

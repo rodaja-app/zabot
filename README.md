@@ -230,20 +230,21 @@ Isso só funciona sem retrabalho porque o front nasce em cima de duas regras fix
 
 ### Back-end (NestJS)
 
-9. **Fundação do back** — projeto Railway (dev/staging/produção), addons Postgres/Redis, CI/CD, estrutura do monólito modular, módulo Auth base.
-10. **Autenticação e usuários** — cadastro (nome/email/senha com hash argon2/bcrypt), envio e verificação de código por email, login (email/senha), JWT, isolamento multi-tenant (RLS).
-11. **Núcleo de sessões WhatsApp** — Baileys por trás do `WhatsAppProvider`, geração de QR/pareamento, persistência de auth state, reconexão automática.
-12. **Proxy e resiliência de conexão** — DataImpulse por sessão, criptografia de credenciais, renovação controlada antes do limite de sticky session (~120 min).
-13. **Motor de contatos e normalização de números** — importação, variações/tentativas controladas, verificação no WhatsApp, cache de formato validado.
-14. **Motor de mensagens e personalização** — múltiplas mensagens por contato, tokens ID1..IDn, upload/processamento de mídia.
-15. **Fila e processamento de envio** — BullMQ, filas por sessão, rate limiting, retries, dead-letter queue.
-16. **Tempo real e observabilidade** — WebSocket real, logs estruturados, métricas, alertas.
+9. **Fundação do back** — projeto Railway (dev/staging/produção), addons Postgres/Redis, CI/CD, estrutura do monólito modular, módulo Auth base **+ infraestrutura de log/erro ponta a ponta desde o primeiro dia** (ver seção 15): filtro global de exceções da API, listener global de falha de fila (BullMQ), listener central de conexão/proxy (Baileys), Pino + Sentry.
+10. **Autenticação e usuários** — cadastro (nome/email/senha com hash argon2/bcrypt), envio e verificação de código por email, login (email/senha), JWT, logout, exclusão de conta, isolamento multi-tenant (RLS).
+11. **Núcleo de sessões WhatsApp** — Baileys por trás do `WhatsAppProvider`, geração de QR/pareamento, persistência de auth state, reconexão automática (distinguindo queda temporária de logout definitivo), renomear/desconectar sessão, sharding entre workers, estatísticas do resumo (Início) em tempo real.
+12. **Proxy e resiliência de conexão** — DataImpulse por sessão, criptografia de credenciais, teste de conectividade, renovação controlada antes do limite de sticky session (~120 min), falha de proxy tratada como falha de conexão.
+13. **Motor de contatos e normalização de números** — importação em lote, adicionar/editar/remover contato, canonicalização, variações/tentativas controladas, verificação no WhatsApp, cache de formato validado, auditoria de tentativas.
+14. **Motor de mensagens e campanhas** — múltiplas mensagens por contato, tokens ID1..IDn, upload/processamento de mídia, seleção de destinatários (todos ou específicos), criação de campanha, limpar histórico de envio.
+15. **Fila, envio e anti-ban** — BullMQ, filas por sessão, rate limiting, delay humano/jitter, rampa de aquecimento para sessão nova, horário de envio conforme fuso do contato, retries, dead-letter queue.
+16. **Planos e uso** — consultar/listar/trocar plano, histórico de pagamentos, limites de uso.
+17. **Observabilidade avançada** — WebSocket real, métricas (Grafana), alertas, backup automático, configurações e info do app. (o log básico já existe desde a etapa 9; aqui é a camada de visualização/alerta em cima do que já é capturado)
 
 ### Integração final
 
-17. **Front + Back conectados** — troca dos repositórios mockados (incluindo `AuthRepository`) pelas chamadas reais à API/WebSocket, testes ponta a ponta, ajustes finos de segurança e preparação para produção.
+18. **Front + Back conectados** — troca dos repositórios mockados (incluindo `AuthRepository`) pelas chamadas reais à API/WebSocket, testes automatizados ponta a ponta (mesmas rotas da API, sem endpoint exclusivo de teste; `WhatsAppProvider` trocado por implementação fake nos testes), ajustes finos de segurança e preparação para produção.
 
-Cada etapa entrega algo testável isoladamente. O front avança 8 etapas inteiras sem nenhuma dependência do backend existir.
+Cada etapa entrega algo testável isoladamente, com teste automatizado próprio (unitário/integração/E2E) fechado antes de avançar para a próxima. O front avança 8 etapas inteiras sem nenhuma dependência do backend existir. **Nenhuma etapa de backend altera telas, textos ou fluxos do front-end** — todas consomem os mesmos repositórios/contratos já definidos nas etapas de front.
 
 ---
 

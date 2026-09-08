@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
@@ -54,6 +56,13 @@ class _InicioScreenState extends State<InicioScreen> {
   bool _statsError = false;
   StreamSubscription<HomeStats>? _statsSubscription;
 
+  // QR code / código de pareamento reais (Etapa 18 — antes disso o card só
+  // mostrava um placeholder estático, ver `_QrCodePlaceholder`).
+  String? _qrCode;
+  StreamSubscription<String?>? _qrCodeSubscription;
+  String? _pairingCode;
+  StreamSubscription<String?>? _pairingCodeSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +73,12 @@ class _InicioScreenState extends State<InicioScreen> {
         _status = status;
         if (status == ZapConnectionStatus.disconnected) {
           _connectMethod = null;
+          // O QR code/código de pareamento do fluxo anterior não vale mais
+          // depois de desconectar — sem isso, cancelar e iniciar um novo
+          // fluxo de QR code podia mostrar por um instante o código antigo
+          // até o backend emitir o próximo.
+          _qrCode = null;
+          _pairingCode = null;
         }
       });
     });
@@ -74,6 +89,21 @@ class _InicioScreenState extends State<InicioScreen> {
     ) {
       if (!mounted) return;
       setState(() => _session = session);
+    });
+
+    _qrCode = widget.connectionRepository.currentQrCode;
+    _qrCodeSubscription = widget.connectionRepository.qrCodeStream.listen((
+      qrCode,
+    ) {
+      if (!mounted) return;
+      setState(() => _qrCode = qrCode);
+    });
+
+    _pairingCode = widget.connectionRepository.currentPairingCode;
+    _pairingCodeSubscription = widget.connectionRepository.pairingCodeStream
+        .listen((pairingCode) {
+      if (!mounted) return;
+      setState(() => _pairingCode = pairingCode);
     });
 
     _loadStats();
@@ -116,6 +146,8 @@ class _InicioScreenState extends State<InicioScreen> {
     _subscription?.cancel();
     _sessionSubscription?.cancel();
     _statsSubscription?.cancel();
+    _qrCodeSubscription?.cancel();
+    _pairingCodeSubscription?.cancel();
     super.dispose();
   }
 
@@ -290,6 +322,8 @@ class _InicioScreenState extends State<InicioScreen> {
           status: _status,
           session: _session,
           connectMethod: _connectMethod,
+          qrCode: _qrCode,
+          pairingCode: _pairingCode,
           l10n: l10n,
           onManagePressed: () => _handleManageConnection(context),
           onConnectPressed: () => _handleConnectPressed(context),
@@ -356,6 +390,8 @@ class _ConnectionCard extends StatelessWidget {
     required this.status,
     required this.session,
     required this.connectMethod,
+    required this.qrCode,
+    required this.pairingCode,
     required this.l10n,
     required this.onManagePressed,
     required this.onConnectPressed,
@@ -365,6 +401,8 @@ class _ConnectionCard extends StatelessWidget {
   final ZapConnectionStatus status;
   final ZapSessionInfo session;
   final _ConnectMethod? connectMethod;
+  final String? qrCode;
+  final String? pairingCode;
   final AppLocalizations l10n;
   final VoidCallback onManagePressed;
   final VoidCallback onConnectPressed;
@@ -446,8 +484,19 @@ class _ConnectionCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
+                if (pairingCode != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.home_connection_pairing_code_label(pairingCode!),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ] else ...[
-                const _QrCodePlaceholder(),
+                _QrCodePlaceholder(qrCode: qrCode),
                 const SizedBox(height: 12),
                 Text(
                   l10n.home_connection_qr_instructions,
@@ -484,14 +533,36 @@ class _ConnectionCard extends StatelessWidget {
   }
 }
 
-/// Placeholder visual do QR code (Etapa 4 é só front — o QR code real vem
-/// do backend na Etapa 17). O anel animado (`qr_scan_frame.riv`) dá a
-/// sensação de "aguardando escaneamento".
+/// Decodifica um data URL (`data:image/png;base64,...`) — formato do
+/// `SessionConnectionUpdate.qr` do backend — para os bytes da imagem.
+/// Retorna `null` se o valor não for um data URL base64 válido, para o card
+/// cair de volta no ícone de placeholder em vez de quebrar a tela.
+Uint8List? _decodeQrCodeDataUrl(String qrCode) {
+  final commaIndex = qrCode.indexOf(',');
+  final base64Part = commaIndex >= 0 ? qrCode.substring(commaIndex + 1) : qrCode;
+  try {
+    return base64Decode(base64Part);
+  } on FormatException {
+    return null;
+  }
+}
+
+/// QR code exibido durante o fluxo de conexão. Renderiza a imagem real
+/// (Etapa 18 — `ApiConnectionRepository`, a partir de
+/// `SessionConnectionUpdate.qr`) quando [qrCode] chega do backend; até lá
+/// (ou se a decodificação falhar), mostra o ícone de placeholder que já
+/// existia desde a Etapa 4. O anel animado (`qr_scan_frame.riv`) continua
+/// por cima nos dois casos, dando a sensação de "aguardando escaneamento".
 class _QrCodePlaceholder extends StatelessWidget {
-  const _QrCodePlaceholder();
+  const _QrCodePlaceholder({this.qrCode});
+
+  final String? qrCode;
 
   @override
   Widget build(BuildContext context) {
+    final qrCode = this.qrCode;
+    final imageBytes = qrCode == null ? null : _decodeQrCodeDataUrl(qrCode);
+
     return Center(
       child: SizedBox(
         width: 180,
@@ -505,11 +576,20 @@ class _QrCodePlaceholder extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.borderDivider),
               ),
-              child: const Icon(
-                Icons.qr_code_2_rounded,
-                size: 96,
-                color: AppColors.textSecondary,
-              ),
+              clipBehavior: Clip.antiAlias,
+              child: imageBytes != null
+                  ? Image.memory(
+                      imageBytes,
+                      width: 180,
+                      height: 180,
+                      fit: BoxFit.contain,
+                      gaplessPlayback: true,
+                    )
+                  : const Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 96,
+                      color: AppColors.textSecondary,
+                    ),
             ),
             Positioned.fill(
               child: IgnorePointer(

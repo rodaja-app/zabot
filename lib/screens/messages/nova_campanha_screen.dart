@@ -1,9 +1,11 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/contact_repository.dart';
 import '../../data/message_repository.dart';
 import '../../data/models/campaign_media_type.dart';
 import '../../data/models/contact.dart';
+import '../../data/models/picked_media.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_button.dart';
@@ -44,8 +46,17 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
   List<Contact> _contacts = [];
   bool _isLoadingContacts = true;
 
+  static const _maxImageFiles = 10;
+  static const _imageExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+  static const _audioExtensions = ['mp3', 'ogg', 'm4a', 'aac', 'amr', 'wav'];
+
   CampaignMediaType _mediaType = CampaignMediaType.none;
-  int _imageCount = 1;
+
+  /// Arquivos reais escolhidos no seletor nativo (Etapa 18 — decisão
+  /// explícita do usuário: upload de mídia de verdade em vez de deixar
+  /// [_mediaType] como seleção só visual). Vazio enquanto nenhum arquivo
+  /// foi escolhido, mesmo que [_mediaType] já esteja marcado.
+  List<PickedMedia> _mediaFiles = [];
 
   /// Limites do intervalo aleatório entre um envio e outro (Menu 2, seção
   /// "Intervalo de envio"). Só a interface é implementada por enquanto —
@@ -189,19 +200,91 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
     _insertText(emoji);
   }
 
-  void _toggleMedia(CampaignMediaType type) {
+  /// Abre o seletor de arquivos nativo para [type] (toque no chip de mídia,
+  /// ou no botão "Selecionar/Trocar arquivo"). Cancelar o seletor não muda
+  /// nada — só um arquivo escolhido de verdade marca [_mediaType].
+  Future<void> _pickMedia(CampaignMediaType type) async {
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: type == CampaignMediaType.document
+            ? FileType.any
+            : FileType.custom,
+        allowedExtensions: switch (type) {
+          CampaignMediaType.images => _imageExtensions,
+          CampaignMediaType.audio => _audioExtensions,
+          CampaignMediaType.document || CampaignMediaType.none => null,
+        },
+        allowMultiple: type == CampaignMediaType.images,
+        withData: true,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.messages_nova_campanha_media_pick_error,
+          ),
+        ),
+      );
+      return;
+    }
+    if (result == null || !mounted) return;
+
+    final picked = result.files
+        .where((file) => file.bytes != null)
+        .take(type == CampaignMediaType.images ? _maxImageFiles : 1)
+        .map(
+          (file) => PickedMedia(
+            bytes: file.bytes!,
+            mimeType: _guessMimeType(file.extension),
+            fileName: file.name,
+          ),
+        )
+        .toList();
+    if (picked.isEmpty) return;
+
     setState(() {
-      if (_mediaType == type) {
-        _mediaType = CampaignMediaType.none;
-      } else {
-        _mediaType = type;
-        if (type == CampaignMediaType.images) _imageCount = 1;
-      }
+      _mediaType = type;
+      _mediaFiles = picked;
     });
   }
 
-  void _adjustImageCount(int delta) {
-    setState(() => _imageCount = (_imageCount + delta).clamp(1, 10));
+  void _clearMedia() {
+    setState(() {
+      _mediaType = CampaignMediaType.none;
+      _mediaFiles = [];
+    });
+  }
+
+  /// Deriva o mimetype pela extensão (`file_picker` não expõe o mimetype
+  /// direto) — cobre exatamente os tipos que `MediaService.MEDIA_RULES`
+  /// aceita para IMAGENS/AUDIO no backend; DOCUMENTO é catch-all lá, então
+  /// um mimetype genérico é aceito sem restrição.
+  String _guessMimeType(String? extension) {
+    switch (extension?.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'ogg':
+        return 'audio/ogg';
+      case 'm4a':
+        return 'audio/mp4';
+      case 'aac':
+        return 'audio/aac';
+      case 'amr':
+        return 'audio/amr';
+      case 'wav':
+        return 'audio/wav';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   void _adjustIntervalMin(int delta) {
@@ -267,7 +350,8 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
       !_isSubmitting &&
       _nonEmptyMessages.isNotEmpty &&
       _contacts.isNotEmpty &&
-      (_sendToAll || _selectedContactIds.isNotEmpty);
+      (_sendToAll || _selectedContactIds.isNotEmpty) &&
+      (_mediaType == CampaignMediaType.none || _mediaFiles.isNotEmpty);
 
   Future<void> _handleSubmit() async {
     if (!_canSubmit) return;
@@ -277,7 +361,9 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
       messages: _nonEmptyMessages,
       recipientCount: _recipientCount,
       mediaType: _mediaType,
-      mediaCount: _mediaType == CampaignMediaType.images ? _imageCount : 0,
+      mediaCount: _mediaFiles.length,
+      media: _mediaFiles,
+      recipientIds: _sendToAll ? null : _selectedContactIds,
     );
 
     if (!mounted) return;
@@ -393,44 +479,86 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
                   icon: Icons.photo_library_rounded,
                   label: l10n.messages_nova_campanha_media_images_option,
                   selected: _mediaType == CampaignMediaType.images,
-                  onTap: () => _toggleMedia(CampaignMediaType.images),
+                  onTap: () => _pickMedia(CampaignMediaType.images),
                 ),
                 _MediaOption(
                   icon: Icons.mic_rounded,
                   label: l10n.messages_nova_campanha_media_audio,
                   selected: _mediaType == CampaignMediaType.audio,
-                  onTap: () => _toggleMedia(CampaignMediaType.audio),
+                  onTap: () => _pickMedia(CampaignMediaType.audio),
                 ),
                 _MediaOption(
                   icon: Icons.description_rounded,
                   label: l10n.messages_nova_campanha_media_document,
                   selected: _mediaType == CampaignMediaType.document,
-                  onTap: () => _toggleMedia(CampaignMediaType.document),
+                  onTap: () => _pickMedia(CampaignMediaType.document),
                 ),
               ],
             ),
-            if (_mediaType == CampaignMediaType.images) ...[
+            if (_mediaType != CampaignMediaType.none) ...[
               const SizedBox(height: 12),
+              if (_mediaFiles.isEmpty)
+                Text(
+                  l10n.messages_nova_campanha_media_no_file_warning,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppColors.statusError),
+                )
+              else ...[
+                if (_mediaType == CampaignMediaType.images)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      l10n.messages_nova_campanha_media_images_count_label(
+                        _mediaFiles.length,
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final file in _mediaFiles)
+                      Chip(
+                        label: Text(
+                          file.fileName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        backgroundColor: AppColors.surfaceCard,
+                        side: const BorderSide(
+                          color: AppColors.borderDivider,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  IconButton(
-                    onPressed: _imageCount > 1
-                        ? () => _adjustImageCount(-1)
-                        : null,
-                    icon: const Icon(Icons.remove_circle_outline_rounded),
-                  ),
-                  Text(
-                    l10n.messages_nova_campanha_media_images_count_label(
-                      _imageCount,
+                  TextButton.icon(
+                    onPressed: () => _pickMedia(_mediaType),
+                    icon: const Icon(Icons.attach_file_rounded, size: 18),
+                    label: Text(
+                      _mediaFiles.isEmpty
+                          ? l10n.messages_nova_campanha_media_pick_file_button
+                          : l10n
+                                .messages_nova_campanha_media_change_file_button,
                     ),
-                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  IconButton(
-                    onPressed: _imageCount < 10
-                        ? () => _adjustImageCount(1)
-                        : null,
-                    icon: const Icon(Icons.add_circle_outline_rounded),
-                  ),
+                  if (_mediaFiles.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: _clearMedia,
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: AppColors.statusError,
+                      ),
+                      label: Text(
+                        l10n.messages_nova_campanha_media_remove_file_button,
+                        style: const TextStyle(color: AppColors.statusError),
+                      ),
+                    ),
                 ],
               ),
             ],

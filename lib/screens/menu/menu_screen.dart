@@ -10,6 +10,7 @@ import '../../data/models/app_info.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/models/payment_history_entry.dart';
 import '../../data/models/plan_option.dart';
+import '../../data/models/plan_purchase_exception.dart';
 import '../../data/models/subscription_plan.dart';
 import '../../data/models/user_account.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -299,7 +300,10 @@ class _PlanCard extends StatelessWidget {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(plan.name),
-                  subtitle: Text('${plan.priceLabel}\n${plan.description}'),
+                  subtitle: Text(
+                    '${plan.priceLabel}\n'
+                    '${l10n.menu_plan_description(plan.messagesLimit)}',
+                  ),
                   trailing: plan.isCurrent
                       ? StatusBadge(
                           status: AppStatus.connected,
@@ -356,8 +360,21 @@ class _PlanCard extends StatelessWidget {
     );
 
     if (selectedId == null) return;
-    await menuRepository.changePlan(selectedId);
-    onPlanChanged();
+
+    // A compra passa pela folha de pagamento nativa (RevenueCat/loja) — o
+    // usuário pode cancelar a qualquer momento, o que é normal e não deve
+    // exibir erro (PlanPurchaseException.cancelled). Qualquer outra falha
+    // (rede, produto indisponível etc.) mostra um snackbar.
+    try {
+      await menuRepository.changePlan(selectedId);
+      onPlanChanged();
+    } on PlanPurchaseException catch (error) {
+      if (error.cancelled) return;
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.menu_plan_purchase_error)),
+      );
+    }
   }
 
   // Mesma correção do diálogo de comparar planos: busca antes de abrir o

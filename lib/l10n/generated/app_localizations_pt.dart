@@ -126,6 +126,11 @@ class AppLocalizationsPt extends AppLocalizations {
       'Aguardando confirmação no WhatsApp do número informado...';
 
   @override
+  String home_connection_pairing_code_label(String code) {
+    return 'Código de pareamento: $code';
+  }
+
+  @override
   String get home_connection_qr_instructions =>
       'Abra o WhatsApp no celular, toque em Aparelhos conectados e escaneie o código acima.';
 
@@ -437,6 +442,26 @@ class AppLocalizationsPt extends AppLocalizations {
   String get messages_nova_campanha_media_audio => 'Áudio';
 
   @override
+  String get messages_nova_campanha_media_pick_file_button =>
+      'Selecionar arquivo';
+
+  @override
+  String get messages_nova_campanha_media_change_file_button =>
+      'Trocar arquivo';
+
+  @override
+  String get messages_nova_campanha_media_remove_file_button =>
+      'Remover mídia';
+
+  @override
+  String get messages_nova_campanha_media_no_file_warning =>
+      'Selecione um arquivo para continuar.';
+
+  @override
+  String get messages_nova_campanha_media_pick_error =>
+      'Não foi possível selecionar o arquivo. Tente novamente.';
+
+  @override
   String get messages_nova_campanha_interval_section_title =>
       'Intervalo de envio';
 
@@ -568,6 +593,15 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get menu_plan_payment_status_failed => 'Recusado';
+
+  @override
+  String menu_plan_description(int limit) {
+    return 'Até $limit mensagens por mês.';
+  }
+
+  @override
+  String get menu_plan_purchase_error =>
+      'Não foi possível concluir a compra. Tente novamente.';
 
   @override
   String get menu_settings_card_title => 'Configurações';

@@ -316,6 +316,12 @@ abstract class AppLocalizations {
   /// **'Aguardando confirmação no WhatsApp do número informado...'**
   String get home_connection_connecting_phone_description;
 
+  /// Código de pareamento exibido durante o fluxo de conexão por número de telefone, quando o backend retorna um código para digitar no WhatsApp
+  ///
+  /// In pt, this message translates to:
+  /// **'Código de pareamento: {code}'**
+  String home_connection_pairing_code_label(String code);
+
   /// Instruções exibidas durante o fluxo de QR code
   ///
   /// In pt, this message translates to:
@@ -803,6 +809,36 @@ abstract class AppLocalizations {
   /// **'Áudio'**
   String get messages_nova_campanha_media_audio;
 
+  /// Botão que abre o seletor de arquivos nativo para anexar mídia à campanha
+  ///
+  /// In pt, this message translates to:
+  /// **'Selecionar arquivo'**
+  String get messages_nova_campanha_media_pick_file_button;
+
+  /// Botão que reabre o seletor de arquivos para substituir a mídia já escolhida
+  ///
+  /// In pt, this message translates to:
+  /// **'Trocar arquivo'**
+  String get messages_nova_campanha_media_change_file_button;
+
+  /// Botão que remove a mídia escolhida e volta a seção de mídia para "nenhuma"
+  ///
+  /// In pt, this message translates to:
+  /// **'Remover mídia'**
+  String get messages_nova_campanha_media_remove_file_button;
+
+  /// Aviso exibido quando um tipo de mídia está marcado mas nenhum arquivo foi escolhido ainda
+  ///
+  /// In pt, this message translates to:
+  /// **'Selecione um arquivo para continuar.'**
+  String get messages_nova_campanha_media_no_file_warning;
+
+  /// Snackbar exibida quando o seletor de arquivos nativo falha
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível selecionar o arquivo. Tente novamente.'**
+  String get messages_nova_campanha_media_pick_error;
+
   /// Título da seção de intervalo aleatório entre envios
   ///
   /// In pt, this message translates to:
@@ -1012,6 +1048,18 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Recusado'**
   String get menu_plan_payment_status_failed;
+
+  /// Descrição de um plano no diálogo Comparar planos, a partir do limite de mensagens
+  ///
+  /// In pt, this message translates to:
+  /// **'Até {limit} mensagens por mês.'**
+  String menu_plan_description(int limit);
+
+  /// Mensagem exibida quando a compra nativa do plano falha (exceto cancelamento pelo usuário)
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível concluir a compra. Tente novamente.'**
+  String get menu_plan_purchase_error;
 
   /// Título do card de configurações na Tela Menu
   ///

@@ -4,6 +4,7 @@ import 'dart:math';
 import '../widgets/status_badge.dart';
 import 'models/campaign.dart';
 import 'models/campaign_media_type.dart';
+import 'models/picked_media.dart';
 
 /// Abstração de campanhas de envio em massa (Etapa 5, README.md seção 13;
 /// Menu 2 — Mensagens). A implementação real (Etapa 17) troca
@@ -15,15 +16,30 @@ abstract class MessageRepository {
   List<Campaign> get currentCampaigns;
 
   /// Cria e "envia" uma campanha (Menu 2, seção "Iniciar envio").
-  /// [recipientCount] é o total de contatos já curados na aba Contatos —
-  /// esta tela não escolhe destinatários, envia para todos os contatos
-  /// importados. O progresso do envio (enviados/pendentes/falhas) é
-  /// emitido em tempo real por [campaignsStream].
+  /// [recipientCount] é o total de destinatários (todos os contatos
+  /// curados na aba Contatos, ou só os [recipientIds] escolhidos
+  /// manualmente — ver abaixo). O progresso do envio
+  /// (enviados/pendentes/falhas) é emitido em tempo real por
+  /// [campaignsStream].
+  ///
+  /// [media] carrega os bytes reais dos arquivos anexados (Etapa 18 —
+  /// decisão explícita do usuário para "Nova campanha" upload de mídia:
+  /// estender e implementar de verdade, em vez de deixar
+  /// [mediaType]/[mediaCount] como seleção só visual sem arquivo nenhum por
+  /// trás — o mock nunca modelou isso, então fica vazio por padrão e é
+  /// ignorado por [MockMessageRepository]).
+  ///
+  /// [recipientIds] é `null`/vazio para "todos os contatos" (modo padrão);
+  /// quando não vazio, restringe o envio a esses ids (modo "contatos
+  /// específicos" da tela). [MockMessageRepository] ignora — ele só simula
+  /// progresso agregado por [recipientCount].
   Future<void> createCampaign({
     required List<String> messages,
     required int recipientCount,
     required CampaignMediaType mediaType,
     int mediaCount = 0,
+    List<PickedMedia> media = const [],
+    Set<String>? recipientIds,
   });
 
   /// Limpa todo o histórico de campanhas (enviadas, pendentes e com falha).
@@ -91,6 +107,8 @@ class MockMessageRepository implements MessageRepository {
     required int recipientCount,
     required CampaignMediaType mediaType,
     int mediaCount = 0,
+    List<PickedMedia> media = const [],
+    Set<String>? recipientIds,
   }) async {
     _sequence++;
     final id = 'campaign-$_sequence';

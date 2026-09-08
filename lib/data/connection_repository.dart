@@ -29,6 +29,28 @@ abstract class ConnectionRepository {
   /// mock, isso só é usado para preencher [currentSession] ao final.
   Future<void> connect({String? phoneNumber});
 
+  /// QR code atual do fluxo de conexão, como data URL
+  /// (`data:image/png;base64,...`) — mesmo formato de
+  /// `SessionConnectionUpdate.qr` no backend (Etapa 18). `null` fora do
+  /// fluxo de QR code em andamento. No mock, sempre `null`: a Etapa 4 nunca
+  /// modelou um QR code de verdade, só o placeholder visual em
+  /// `inicio_screen.dart`.
+  String? get currentQrCode;
+
+  /// Emite sempre que um novo QR code chega durante o fluxo de conexão
+  /// (o backend gera um novo a cada expiração, até o usuário escanear ou o
+  /// fluxo ser cancelado).
+  Stream<String?> get qrCodeStream;
+
+  /// Código de pareamento atual do fluxo de conexão por número de telefone
+  /// (`SessionConnectionUpdate.pairingCode` no backend, Etapa 18) — `null`
+  /// fora desse fluxo. No mock, sempre `null`.
+  String? get currentPairingCode;
+
+  /// Emite sempre que um novo código de pareamento chega durante o fluxo de
+  /// conexão por número de telefone.
+  Stream<String?> get pairingCodeStream;
+
   /// Desconecta o WhatsApp (ou cancela um fluxo de conexão em andamento).
   Future<void> disconnect();
 
@@ -85,6 +107,23 @@ class MockConnectionRepository implements ConnectionRepository {
 
   @override
   Stream<HomeStats> get statsStream => _statsController.stream;
+
+  // O mock nunca modelou QR code/código de pareamento reais (Etapa 4 é só
+  // front, ver `_QrCodePlaceholder` em `inicio_screen.dart`) — a
+  // implementação real (`ApiConnectionRepository`, Etapa 18) é quem
+  // preenche isto de verdade, a partir de `SessionConnectionUpdate.qr`/
+  // `.pairingCode`.
+  @override
+  String? get currentQrCode => null;
+
+  @override
+  Stream<String?> get qrCodeStream => Stream<String?>.empty();
+
+  @override
+  String? get currentPairingCode => null;
+
+  @override
+  Stream<String?> get pairingCodeStream => Stream<String?>.empty();
 
   void _setStatus(ZapConnectionStatus status) {
     _status = status;

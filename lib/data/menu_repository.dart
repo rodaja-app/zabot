@@ -61,20 +61,20 @@ class MockMenuRepository implements MenuRepository {
       id: 'basico',
       name: 'Plano Básico',
       priceLabel: 'R\$ 39,90/mês',
-      description: 'Até 1.000 mensagens por mês.',
+      messagesLimit: 1000,
     ),
     PlanOption(
       id: 'pro',
       name: 'Plano Pro',
       priceLabel: 'R\$ 99,90/mês',
-      description: 'Até 5.000 mensagens por mês.',
+      messagesLimit: 5000,
       isCurrent: true,
     ),
     PlanOption(
       id: 'premium',
       name: 'Plano Premium',
       priceLabel: 'R\$ 199,90/mês',
-      description: 'Até 15.000 mensagens por mês.',
+      messagesLimit: 15000,
     ),
   ];
 

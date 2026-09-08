@@ -166,6 +166,15 @@
   "@home_connection_connecting_phone_description": {
     "description": "Texto do card de conexão durante o fluxo de conexão por número de telefone"
   },
+  "home_connection_pairing_code_label": "Código de pareamento: {code}",
+  "@home_connection_pairing_code_label": {
+    "description": "Código de pareamento exibido durante o fluxo de conexão por número de telefone, quando o backend retorna um código para digitar no WhatsApp",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "home_connection_qr_instructions": "Abra o WhatsApp no celular, toque em Aparelhos conectados e escaneie o código acima.",
   "@home_connection_qr_instructions": {
     "description": "Instruções exibidas durante o fluxo de QR code"
@@ -529,6 +538,26 @@
   "@messages_nova_campanha_media_audio": {
     "description": "Opção de mídia: áudio"
   },
+  "messages_nova_campanha_media_pick_file_button": "Selecionar arquivo",
+  "@messages_nova_campanha_media_pick_file_button": {
+    "description": "Botão que abre o seletor de arquivos nativo para anexar mídia à campanha"
+  },
+  "messages_nova_campanha_media_change_file_button": "Trocar arquivo",
+  "@messages_nova_campanha_media_change_file_button": {
+    "description": "Botão que reabre o seletor de arquivos para substituir a mídia já escolhida"
+  },
+  "messages_nova_campanha_media_remove_file_button": "Remover mídia",
+  "@messages_nova_campanha_media_remove_file_button": {
+    "description": "Botão que remove a mídia escolhida e volta a seção de mídia para \"nenhuma\""
+  },
+  "messages_nova_campanha_media_no_file_warning": "Selecione um arquivo para continuar.",
+  "@messages_nova_campanha_media_no_file_warning": {
+    "description": "Aviso exibido quando um tipo de mídia está marcado mas nenhum arquivo foi escolhido ainda"
+  },
+  "messages_nova_campanha_media_pick_error": "Não foi possível selecionar o arquivo. Tente novamente.",
+  "@messages_nova_campanha_media_pick_error": {
+    "description": "Snackbar exibida quando o seletor de arquivos nativo falha"
+  },
   "messages_nova_campanha_interval_section_title": "Intervalo de envio",
   "@messages_nova_campanha_interval_section_title": {
     "description": "Título da seção de intervalo aleatório entre envios"
@@ -697,6 +726,19 @@
   "menu_plan_payment_status_failed": "Recusado",
   "@menu_plan_payment_status_failed": {
     "description": "Rótulo de status de um pagamento recusado"
+  },
+  "menu_plan_description": "Até {limit} mensagens por mês.",
+  "@menu_plan_description": {
+    "description": "Descrição de um plano no diálogo Comparar planos, a partir do limite de mensagens",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "menu_plan_purchase_error": "Não foi possível concluir a compra. Tente novamente.",
+  "@menu_plan_purchase_error": {
+    "description": "Mensagem exibida quando a compra nativa do plano falha (exceto cancelamento pelo usuário)"
   },
   "menu_settings_card_title": "Configurações",
   "@menu_settings_card_title": {

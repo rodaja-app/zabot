@@ -1,0 +1,755 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Os modelos restantes (Logs de Auditoria — ver README.md seção 7) entram
+// a partir da etapa 16/17, módulo a módulo.
+
+/// Etapa 10 (Autenticação e usuários) — ver README.md seções 7 e 9.
+/// RLS NÃO é aplicado nesta tabela: login e cadastro acontecem antes de
+/// existir um usuário autenticado, então não há contexto de tenant
+/// (`app.current_user_id`) para o RLS usar — aplicar RLS aqui quebraria a
+/// própria consulta de login (problema do "ovo e da galinha"). A partir da
+/// etapa 11, as tabelas que pertencem a um usuário (sessões, contatos,
+/// campanhas etc.) usam RLS de verdade, com `PrismaService.withTenantContext()`
+/// (ver src/prisma/prisma.service.ts) definindo `app.current_user_id` por
+/// transação.
+model User {
+  id              String    @id @default(uuid())
+  name            String
+  email           String    @unique
+  passwordHash    String
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  verificationCodes VerificationCode[]
+  refreshTokens     RefreshToken[]
+  session           Session?
+  contacts          Contact[]
+  campaigns         Campaign[]
+  subscription      Subscription?
+  paymentHistory    PaymentHistoryEntry[]
+  settings          UserSettings?
+
+  @@map("users")
+}
+
+/// Código de verificação de 6 dígitos enviado por email no cadastro. Guarda
+/// só o hash (sha256 — código de baixa entropia e curta duração, não precisa
+/// do custo do argon2 usado na senha) e nunca o código em texto puro.
+/// `attempts` limita força bruta contra um código específico; `expiresAt`
+/// limita a janela de uso; `consumedAt` impede reuso do mesmo código.
+model VerificationCode {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("verification_codes")
+}
+
+enum RefreshTokenStatus {
+  ATIVO
+  ROTACIONADO
+  REVOGADO
+}
+
+/// Um registro por refresh token emitido. O token em si é um JWT assinado com
+/// JWT_REFRESH_SECRET; `id` aqui é o `jti` (identificador único) desse JWT —
+/// o segredo nunca fica no banco, só a referência para permitir revogação.
+/// Rotação em cadeia via `familyId`: cada uso do endpoint /auth/refresh marca
+/// o token anterior como ROTACIONADO e cria um novo na mesma família.
+/// Reapresentar um token ROTACIONADO ou REVOGADO é sinal de reuso (token
+/// roubado) — revoga a família inteira (ver AuthService.refresh).
+model RefreshToken {
+  id        String             @id
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyId  String
+  status    RefreshTokenStatus @default(ATIVO)
+  expiresAt DateTime
+  createdAt DateTime           @default(now())
+  revokedAt DateTime?
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+/// Espelha 1:1 os 3 estados de `ZapConnectionStatus` do front
+/// (lib/data/models/zap_connection_status.dart) — não adicionar estado aqui
+/// sem adicionar lá primeiro (ou o front nunca vai saber interpretar).
+enum SessionStatus {
+  DESCONECTADA
+  CONECTANDO
+  CONECTADA
+}
+
+/// Etapa 11 (Sessões WhatsApp) — ver README.md seções 3 e 9.
+///
+/// PRIMEIRA tabela com RLS de verdade do projeto (`User` é propositalmente
+/// isenta — ver comentário acima). RLS não é declarável no schema do Prisma,
+/// então a política vive em `prisma/rls/001_sessions_rls.sql`, aplicada uma
+/// vez via `prisma db execute` depois de cada `prisma migrate dev` que mexer
+/// nesta tabela (passo documentado no README do backend). Todo acesso desta
+/// tabela pelo código da aplicação passa por
+/// `PrismaService.withTenantContext(userId, ...)`.
+///
+/// Modelo é 1 sessão WhatsApp por usuário (`@@unique([userId])`) — o front
+/// só tem uma tela de conexão (`ConnectionRepository.currentSession` é um
+/// getter síncrono, não uma lista), então não há necessidade de multi-sessão
+/// por usuário nesta fase; se isso mudar depois é uma migração aditiva
+/// (soltar o unique), não uma reescrita.
+///
+/// `workerId`/`workerHeartbeatAt` são o "registro central" de sharding da
+/// seção 3 do README: qual instância de worker de sessão está segurando o
+/// socket Baileys ativo desta sessão agora. `SessionService` reivindica a
+/// sessão via update condicional (`workerId IS NULL OR heartbeat velho`) e
+/// renova o heartbeat periodicamente enquanto a conexão estiver ativa —
+/// sem isso, duas instâncias poderiam tentar abrir o mesmo socket Baileys ao
+/// mesmo tempo.
+///
+/// `contactsImported`/`messagesSent`/`messagesPending`/`failures` espelham
+/// `HomeStats` do front (lib/data/models/home_stats.dart; `totalMessages` lá
+/// é um getter derivado, nunca persistido aqui pelo mesmo motivo). Ficam
+/// zerados e reais desde já — os módulos que de fato geram esses números
+/// (contatos: etapa 13; envio: etapas 14/15) apenas incrementam essas
+/// colunas; esta etapa só garante que elas existem e são servidas de verdade
+/// via WebSocket, nunca com valor inventado.
+model Session {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String        @default("Sessão principal")
+  phoneNumber String?
+  status      SessionStatus @default(DESCONECTADA)
+
+  workerId          String?
+  workerHeartbeatAt DateTime?
+
+  lastConnectedAt      DateTime?
+  lastDisconnectReason String?
+
+  contactsImported Int @default(0)
+  messagesSent     Int @default(0)
+  messagesPending  Int @default(0)
+  failures         Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authKeys SessionAuthKey[]
+  proxy    ProxyConfig?
+
+  @@map("sessions")
+}
+
+/// Substitui o `useMultiFileAuthState` padrão do Baileys (arquivos em disco)
+/// por persistência em Postgres — exigência explícita do README ("auth state
+/// fica persistido em banco, não apenas em arquivo local"), necessária tanto
+/// para sobreviver a redeploy no Railway quanto para o modelo de sharding
+/// (outro worker precisa conseguir retomar a sessão). Cada linha é uma
+/// credencial/chave do protocolo Signal do WhatsApp (`creds`, pre-keys,
+/// sender-keys etc.) — dado altamente sensível (equivale a "estar logado no
+/// WhatsApp da pessoa"), por isso `ciphertext`/`iv`/`authTag` (AES-256-GCM
+/// via `SessionCryptoService`) em vez de guardar o JSON em texto puro,
+/// cumprindo a seção 9 do README ("dados sensíveis de sessão criptografados
+/// em repouso"). `userId` é redundante com `session.userId` de propósito —
+/// evita subquery na política de RLS (ver rls/001_sessions_rls.sql).
+model SessionAuthKey {
+  id String @id @default(uuid())
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String
+
+  keyType String
+  keyId   String @default("")
+
+  ciphertext Bytes
+  iv         Bytes
+  authTag    Bytes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, keyType, keyId])
+  @@index([userId])
+  @@map("session_auth_keys")
+}
+
+/// Protocolo do proxy DataImpulse usado pelo worker ao abrir o socket Baileys
+/// (README §4). SOCKS5 é a escolha padrão do serviço (`ProxyConfigService`) —
+/// HTTP fica disponível para quem configurar `DATAIMPULSE_PROTOCOL=HTTP`.
+enum ProxyProtocol {
+  HTTP
+  SOCKS5
+}
+
+/// Etapa 12 (Proxy e resiliência de conexão) — ver README.md seção 4.
+///
+/// Uma linha por sessão (`@@unique([sessionId])`), nunca por usuário — README
+/// §4 é explícito: "cada sessão tem sua própria configuração de proxy". Não
+/// existe rota/tela para o usuário cadastrar isso: a conta DataImpulse é uma
+/// só (`DATAIMPULSE_HOST/PORT/USERNAME/PASSWORD` no ambiente do backend — ver
+/// env.validation.ts) e o que varia por sessão é só o `stickyKey`, o
+/// identificador de sessão sticky que o DataImpulse usa para devolver sempre
+/// o mesmo IP residencial/mobile por até ~120 min (`ProxyConfigService`
+/// monta o username final como `LOGIN__sessid.<stickyKey>`). Isso é o que dá
+/// a cada sessão WhatsApp um IP dedicado sem precisar de uma conta
+/// DataImpulse por cliente.
+///
+/// `credentialsCiphertext/iv/authTag` guardam o par usuário/senha da conta
+/// DataImpulse criptografado em repouso (AES-256-GCM via
+/// `SessionCryptoService`, mesmo serviço usado pelo auth state do Baileys —
+/// README §9: "credenciais de proxy... criptografadas em repouso"), mesmo
+/// vindo do `.env` e não de input do usuário: uma cópia em texto puro no
+/// banco seria um ponto de vazamento a mais desnecessário.
+///
+/// `userId` é redundante com `session.userId` de propósito, mesmo motivo do
+/// `SessionAuthKey` — evita subquery na política de RLS.
+model ProxyConfig {
+  id String @id @default(uuid())
+
+  sessionId String  @unique
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String
+
+  protocol ProxyProtocol
+  host     String
+  port     Int
+
+  /// Identificador da sessão sticky do DataImpulse (parâmetro `sessid` do
+  /// username) — trocado periodicamente pelo worker antes do IP expirar (ver
+  /// `BaileysWhatsAppProvider.scheduleStickyRenewal`), nunca no meio de uma
+  /// operação, sempre via ciclo de reconexão controlado.
+  stickyKey       String
+  stickyRenewedAt DateTime @default(now())
+
+  credentialsCiphertext Bytes
+  credentialsIv         Bytes
+  credentialsAuthTag    Bytes
+
+  lastTestedAt  DateTime?
+  lastTestOk    Boolean?
+  lastTestError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("proxy_configs")
+}
+
+/// Espelha os 3 estados que `ContactsRepository`/telas do front precisam
+/// distinguir (README §5/13): PENDENTE = ainda não passou pela fila
+/// `queue:validate-numbers` (ou está esperando sessão conectar — ver
+/// `failureReason`); VALIDO = `normalizedPhone` é um formato confirmado no
+/// WhatsApp (cache — nunca mais re-testado neste contato); INVALIDO =
+/// esgotou as tentativas de `PhoneNumberService.generateCandidates()` sem
+/// nenhuma bater no WhatsApp.
+enum ContactStatus {
+  PENDENTE
+  VALIDO
+  INVALIDO
+}
+
+/// Etapa 13 (Motor de contatos e normalização de números) — ver README.md
+/// raiz seções 5, 6 e 13.
+///
+/// `rawPhone` é exatamente o que o usuário digitou/importou (nunca
+/// sobrescrito — é o que aparece de volta se toda tentativa falhar).
+/// `normalizedPhone` só é preenchido quando `PhoneNumberService` +
+/// `WhatsAppProvider.checkNumbers()` confirmam um candidato de verdade contra
+/// o WhatsApp (README §5 passo 4 — "cache do formato validado"): a partir daí
+/// o envio (etapas 14/15) usa sempre este campo, nunca re-testa. Enquanto
+/// `status` for PENDENTE, `normalizedPhone` é null.
+///
+/// `attempts`/`lastAttemptAt`/`failureReason`/`verificationLog` implementam o
+/// "registro auditável" do README §5 passo 5: `verificationLog` é um array
+/// JSON append-only (`{candidato, resultado, timestamp}` por tentativa) —
+/// permite reconstruir exatamente por que um número foi marcado INVALIDO
+/// (número não existe no WhatsApp vs. nenhum candidato gerado bateu) sem
+/// precisar de uma tabela separada (mandato do projeto: solução mais robusta
+/// com o mínimo de código). `failureReason` guarda só a causa mais recente,
+/// já categorizada (nunca genérica — ver README raiz), para exibição rápida
+/// sem precisar abrir o log inteiro.
+///
+/// `customFields` guarda os campos dinâmicos ID1..IDn do front
+/// (`Contact.customFields` em lib/data/models/contact.dart) como JSON —
+/// esquema livre por definição (o usuário decide quantas/quais colunas tem
+/// sua planilha de importação), então uma coluna JSON é a modelagem correta
+/// aqui, não uma tabela `ContactCustomField` à parte.
+model Contact {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rawPhone        String
+  normalizedPhone String?
+  customFields    Json    @default("{}")
+
+  status        ContactStatus @default(PENDENTE)
+  attempts      Int           @default(0)
+  lastAttemptAt DateTime?
+  failureReason String?
+  /// Array JSON append-only — ver comentário do model acima.
+  verificationLog Json @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaignRecipients CampaignRecipient[]
+
+  @@index([userId])
+  @@index([userId, normalizedPhone])
+  @@map("contacts")
+}
+
+/// Espelha `CampaignMediaType` do front (lib/data/models/campaign_media_type.dart:
+/// none/images/audio/document) — NENHUMA/IMAGENS/AUDIO/DOCUMENTO em vez do
+/// nome em inglês só para seguir a convenção Portuguesa já usada nos demais
+/// enums deste schema (SessionStatus, ContactStatus etc.); o mapeamento 1:1
+/// para o enum do front fica na camada de integração (etapa 18), assim como
+/// já acontece com `ContactStatus` hoje (`ContactDto.status` é aditivo, o
+/// front mock atual não lê o campo).
+enum CampaignMediaType {
+  NENHUMA
+  IMAGENS
+  AUDIO
+  DOCUMENTO
+}
+
+/// Espelha os 2 valores de `AppStatus` que o front usa no nível de campanha
+/// (lib/widgets/status_badge.dart + lib/data/models/campaign.dart): PENDENTE
+/// enquanto `pendingCount > 0`, ENVIADA quando a fila de envio (etapa 15)
+/// zera `pendingCount` (ou, caso especial espelhado do mock — ver
+/// `MockMessageRepository.createCampaign` — quando a campanha nasce sem
+/// nenhum destinatário resolvido, já é criada ENVIADA).
+enum CampaignStatus {
+  PENDENTE
+  ENVIADA
+}
+
+/// Estados de progresso por destinatário (`CampaignRecipient`) e por envio
+/// individual (`Envio`) — mesmos 3 nomes por simetria com `ContactStatus`,
+/// embora o significado seja outro aqui (progresso de entrega, não de
+/// verificação de número).
+enum EnvioStatus {
+  PENDENTE
+  ENVIADO
+  FALHOU
+}
+
+/// Etapa 14 (Motor de mensagens e campanhas) — ver README.md raiz seções 6,
+/// 7 e 13, e backend/README.md seção "Etapa 14" para as decisões de design
+/// (gaps do contrato mockado do front, divisão de escopo com a etapa 15).
+///
+/// `recipientCount`/`sentCount`/`pendingCount`/`failedCount` são contadores
+/// denormalizados em unidade de CONTATO (nunca de `Envio`, que é por
+/// contato×mensagem) — é o que faz `Campaign.progress` do front
+/// (`(sentCount + failedCount) / recipientCount`) nunca passar de 1.0 numa
+/// campanha com mais de 1 mensagem por contato. Cada `CampaignRecipient`
+/// contribui para exatamente um destes 3 buckets a qualquer momento (ver
+/// comentário em `CampaignRecipient` abaixo); só a etapa 15 (worker de
+/// envio) escreve nestes contadores depois da criação, pelo mesmo motivo de
+/// `Session.contactsImported`/`messagesSent` (nunca inventados, sempre
+/// espelhando uma transição de estado real já persistida).
+///
+/// `mediaType`/`mediaCount` são denormalizados a partir de `media` (nunca
+/// confiar em valor enviado pelo cliente sem checar contra o que de fato foi
+/// anexado) — ver `CampaignsService.createCampaign`.
+model Campaign {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status     CampaignStatus    @default(PENDENTE)
+  mediaType  CampaignMediaType @default(NENHUMA)
+  mediaCount Int               @default(0)
+
+  recipientCount Int @default(0)
+  sentCount      Int @default(0)
+  pendingCount   Int @default(0)
+  failedCount    Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages   CampaignMessage[]
+  media      CampaignMedia[]
+  recipients CampaignRecipient[]
+  envios     Envio[]
+
+  @@index([userId])
+  @@map("campaigns")
+}
+
+/// Uma das 1 a 5 mensagens de uma campanha (README raiz §5/13 — "até 5
+/// mensagens por contato"). `text` é o texto BRUTO como digitado no front,
+/// com tokens `{ID1}`, `{ID2}`... ainda não substituídos (a personalização é
+/// por destinatário, feita em cima deste template na hora do envio de
+/// verdade — etapa 15, via `PersonalizationService`) e com a formatação
+/// `*negrito*`/`_itálico_` do WhatsApp já embutida pelo próprio front —
+/// nenhuma das duas coisas é interpretada aqui, só armazenada e repassada.
+model CampaignMessage {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String
+
+  /// Posição entre as mensagens da campanha (0 a 4) — define a ordem de
+  /// envio e casa com `messages[0]` sendo usado como `title`/`messagePreview`
+  /// no front.
+  order Int
+  text  String
+
+  envios Envio[]
+
+  @@unique([campaignId, order])
+  @@index([userId])
+  @@map("campaign_messages")
+}
+
+/// Um arquivo de mídia anexado a uma campanha (README raiz §7). `campaignId`
+/// é opcional de propósito: o upload (`POST /campaigns/media`) acontece
+/// ANTES da campanha existir (o front não tem tela de progresso de upload
+/// hoje — ver backend/README.md "Etapa 14" — então o fluxo real é
+/// upload-depois-referencia, não multipart misto com os campos da
+/// campanha); `CampaignsService.createCampaign` "adota" as mídias enviadas
+/// em `mediaIds`, setando `campaignId`. Mídia nunca referenciada por nenhuma
+/// campanha (upload abandonado) fica órfã — limpeza de órfãos é um job de
+/// manutenção fora do escopo desta etapa, não um requisito funcional do
+/// README.
+///
+/// `storageKey` é a chave/caminho dentro do provider de storage escolhido
+/// (`MediaStorageService` — S3-compatível ou disco local, nunca a URL
+/// pública direto: ver comentário do serviço).
+model CampaignMedia {
+  id         String    @id @default(uuid())
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String
+
+  /// Categoria escolhida no upload (`POST /campaigns/media?type=...`) — nunca
+  /// re-inferida do `mimeType` na hora de criar a campanha (evitaria
+  /// ambiguidade, ex.: decidir se "application/pdf" é DOCUMENTO só pelo mime).
+  /// `CampaignsService.createCampaign` exige que todas as mídias de uma
+  /// mesma campanha tenham o mesmo `type` (o front só suporta 1 categoria de
+  /// mídia por campanha — ver `CampaignMediaType` do front).
+  type       CampaignMediaType
+  storageKey String
+  mimeType   String
+  sizeBytes  Int
+  /// Só relevante para IMAGENS ("Várias imagens na mesma mensagem" — README
+  /// §5/13) — define a ordem de exibição/envio entre os anexos.
+  order Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([campaignId])
+  @@map("campaign_media")
+}
+
+/// Um destinatário (contato) de uma campanha — existe 1 linha por
+/// (campanha, contato), criada na hora da criação da campanha a partir da
+/// resolução de destinatários (README raiz §13: "seleção de destinatários,
+/// todos ou específicos" — ver `CampaignsService.resolveRecipients`, que só
+/// aceita contatos com `Contact.status = VALIDO`).
+///
+/// `status` é o rollup de TODOS os `Envio`s deste destinatário nesta
+/// campanha (1 por mensagem da campanha): ENVIADO só quando todos os envios
+/// tiverem sucesso; FALHOU assim que qualquer um deles falhar em definitivo
+/// (estado terminal — não volta a PENDENTE/ENVIADO mesmo que outra mensagem
+/// do mesmo contato ainda esteja em andamento, para que os contadores da
+/// `Campaign` nunca fiquem inconsistentes); PENDENTE enquanto nenhuma das
+/// duas condições acima for verdadeira. Quem aplica esta regra e mantém
+/// `Campaign.sentCount/pendingCount/failedCount` em sincronia é o worker de
+/// envio da etapa 15 — esta etapa só cria a linha PENDENTE inicial.
+model CampaignRecipient {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  userId     String
+
+  status EnvioStatus @default(PENDENTE)
+
+  envios Envio[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campaignId, contactId])
+  @@index([userId])
+  @@map("campaign_recipients")
+}
+
+/// Um envio individual: 1 por (destinatário × mensagem da campanha) — exatamente
+/// o model "Envios" do README raiz §7 ("1 por contato × mensagem, com status
+/// e histórico de tentativas"). Criado PENDENTE na criação da campanha;
+/// quem de fato envia via `WhatsAppProvider`, aplica retry/backoff e escreve
+/// `status`/`attempts`/`failureReason`/`sentAt` é o worker da fila de envio
+/// da etapa 15 (README raiz §6 — "Fila de envio... Worker consome o job...
+/// Resultado grava no banco").
+model Envio {
+  id          String            @id @default(uuid())
+  campaignId  String
+  campaign    Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   CampaignRecipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  messageId   String
+  message     CampaignMessage   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId      String
+
+  status        EnvioStatus @default(PENDENTE)
+  attempts      Int         @default(0)
+  failureReason String?
+  sentAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([recipientId, messageId])
+  @@index([userId])
+  @@index([campaignId, status])
+  @@map("envios")
+}
+
+/// Espelha os 3 estados que `SubscriptionPlan.status`/`AppStatus` (front,
+/// lib/data/models/subscription_plan.dart + lib/widgets/status_badge.dart)
+/// precisam distinguir no card de plano: ATIVA → `AppStatus.connected`,
+/// TRIAL → `AppStatus.pending`, EXPIRADA → `AppStatus.failed`. Não existe um
+/// 4º estado "sem plano": usuário sem `Subscription` (ou cuja única linha
+/// está EXPIRADA) é tratado como EXPIRADA tanto para exibição quanto para
+/// bloqueio de envio — ver comentário do model `Subscription` abaixo.
+enum SubscriptionStatus {
+  ATIVA
+  TRIAL
+  EXPIRADA
+}
+
+/// Status de uma linha do histórico de pagamentos — espelha o reaproveitamento
+/// de `AppStatus` que `PaymentHistoryEntry` (front) já faz (`sent`/`pending`/`failed`
+/// como "paga"/"pendente"/"falhou"), só que com nomes próprios (não é o mesmo
+/// domínio de `EnvioStatus`: aqui é sucesso de cobrança, não de entrega de
+/// mensagem).
+enum PaymentStatus {
+  PAGO
+  PENDENTE
+  FALHOU
+}
+
+/// Etapa 16 (Planos e uso — README raiz §13, backend/README.md "Etapa 16"
+/// para o porquê da arquitetura RevenueCat). Catálogo ESTÁTICO de planos —
+/// não pertence a nenhum usuário. Não usa RLS pelo motivo oposto ao de
+/// `User` (que é isento porque precede o tenant): aqui é porque o dado é
+/// compartilhado por TODOS os tenants, nunca escrito por request de usuário
+/// (populado por seed — ver backend/README.md "Rodando localmente").
+///
+/// `key` casa 1:1 com `PlanOption.id` do front
+/// (lib/data/models/plan_option.dart: 'basico'/'pro'/'premium') — é o
+/// identificador estável usado nas rotas públicas desta API, nunca o uuid
+/// interno. `revenueCatProductId` é o `product_id` configurado no dashboard
+/// da RevenueCat para este plano (RevenueCat unifica o produto Apple/Google
+/// sob um único identificador de produto no seu catálogo) — é o campo que
+/// `RevenueCatWebhookService`/`PlansService.syncFromRevenueCat` usam para
+/// mapear um evento/CustomerInfo de volta para uma linha desta tabela.
+model Plan {
+  id   String @id @default(uuid())
+  key  String @unique
+  name String
+
+  /// Rótulo pronto pra exibir (ex.: "R$ 99,90/mês"). Quem define o preço de
+  /// verdade é a loja (App Store Connect / Play Console) — este campo é só
+  /// para a UI não ficar em branco antes do primeiro sync, nunca usado para
+  /// cobrança real.
+  priceLabel    String
+  messagesLimit Int
+
+  revenueCatProductId String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions  Subscription[]
+  paymentHistory PaymentHistoryEntry[]
+
+  @@map("plans")
+}
+
+/// Etapa 16 — espelha, por usuário, o estado de assinatura que a RevenueCat
+/// controla de verdade (compra nativa via StoreKit/Play Billing — decisão
+/// "RevenueCat" tomada porque ZaBot é distribuído via App Store/Play Store,
+/// e as duas exigem que compras que desbloqueiam funcionalidade do app usem
+/// o sistema de compra nativo da própria loja: ver backend/README.md
+/// "Etapa 16"). Este backend NUNCA processa pagamento nem inicia/cancela
+/// assinatura — só reflete o que a RevenueCat manda via webhook
+/// (`RevenueCatWebhookService`) ou via sync sob demanda
+/// (`PlansService.syncFromRevenueCat`, chamado pelo app logo após uma compra
+/// bem-sucedida, para não depender só da entrega do webhook — RevenueCat
+/// entrega a maioria dos webhooks em 5-60s, mas não é instantâneo).
+///
+/// RLS de verdade, como as demais tabelas de tenant — mas escrito a partir
+/// do webhook (sem JWT/request de usuário) via
+/// `PrismaService.withTenantContext(appUserId, ...)`, usando o `app_user_id`
+/// do payload (que é sempre o `User.id` deste backend — convenção de
+/// integração: o app chama `Purchases.logIn(userId)` da RevenueCat logo após
+/// o login/cadastro próprio) como tenant, já que o payload só chega depois
+/// de passar pela verificação de autenticidade do webhook (header/HMAC) —
+/// mesmo padrão de `SendMessageProcessorService`, que também deriva o
+/// tenant de um campo confiável (`job.data.userId`) em vez de um JWT ao
+/// vivo (etapa 15).
+///
+/// `planId` nulo = nenhuma compra reconhecida ainda para este usuário (conta
+/// nova, ou assinatura expirada sem plano equivalente identificado). Junto
+/// com `status = EXPIRADA` como default, um usuário sem nenhuma linha aqui é
+/// bloqueado por `PlansService.assertWithinUsageLimit` sem precisar de um
+/// caso especial — mesma filosofia de "nunca inventar acesso sem dado que
+/// confirme" já usada em `ContactStatus`/`EnvioStatus`.
+///
+/// `messagesUsed` é reiniciado a cada novo período de cobrança (evento
+/// RENEWAL — ver `RevenueCatWebhookService`). Contabiliza `Envio`s
+/// ENFILEIRADOS na criação da campanha (`CampaignsService.createCampaign`),
+/// não só os que tiveram sucesso de entrega — mesmo padrão de
+/// `Campaign.recipientCount` (contado na criação, nunca recalculado depois):
+/// evita condição de corrida entre checar o limite e persistir os `Envio`s,
+/// já que as duas coisas acontecem na mesma transação.
+model Subscription {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id])
+
+  status SubscriptionStatus @default(EXPIRADA)
+  /// false quando a RevenueCat reportou `CANCELLATION` mas o acesso ainda é
+  /// válido até `currentPeriodEnd` — cancelamento não revoga acesso
+  /// imediatamente pela loja, só desliga a renovação automática.
+  autoRenew Boolean @default(true)
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  messagesUsed Int @default(0)
+
+  store                   String?
+  environment             String?
+  revenueCatEntitlementId String?
+  originalTransactionId   String?
+
+  lastEventType String?
+  lastEventAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+/// Item do "Histórico de pagamentos" do front (Menu 3 —
+/// lib/data/models/payment_history_entry.dart). Uma linha por evento
+/// financeiramente relevante recebido da RevenueCat (ver
+/// `RevenueCatWebhookService.PAYMENT_HISTORY_EVENT_TYPES`) — eventos de
+/// ciclo de vida sem impacto de cobrança (ex. `EXPIRATION`) atualizam
+/// `Subscription` mas não geram linha aqui.
+///
+/// `amountCents`/`currency` vêm direto de `price`/`currency` do payload do
+/// webhook e podem ser `null` quando a RevenueCat não os inclui (campo
+/// "Sometimes" no contrato) — quem exibe trata isso como rótulo genérico, em
+/// vez de inventar um valor. `revenueCatEventId` é o `id` do evento que
+/// originou a linha (único — RevenueCat pode reentregar o mesmo evento mais
+/// de uma vez, ver `RevenueCatWebhookService`).
+///
+/// Mesma exceção de RLS-por-tenant-derivado-do-payload de `Subscription`
+/// (ver comentário acima) — escrito via `withTenantContext(appUserId, ...)`.
+model PaymentHistoryEntry {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id])
+
+  /// Tipo do evento RevenueCat que originou esta linha (ex.: "INITIAL_PURCHASE",
+  /// "RENEWAL", "CANCELLATION") — guardado como veio, nunca traduzido para um
+  /// enum fechado: novos tipos futuros da RevenueCat continuam sendo
+  /// registrados sem exigir migração de schema.
+  eventType String
+  status    PaymentStatus @default(PAGO)
+
+  amountCents Int?
+  currency    String?
+
+  occurredAt        DateTime
+  revenueCatEventId String   @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("payment_history_entries")
+}
+
+/// Guarda de idempotência + trilha de auditoria bruta dos webhooks da
+/// RevenueCat (Etapa 16) — mesmo espírito operacional de
+/// `DeadLetterQueueService` na etapa 15 ("Postgres é fonte da verdade"), só
+/// que aqui a própria tabela É a fonte da verdade (não há fila por trás).
+///
+/// NÃO usa RLS: não é dado de negócio por tenant que algum endpoint
+/// autenticado devolve — é um registro técnico interno, verificado e escrito
+/// pelo próprio `RevenueCatWebhookService` antes mesmo de se saber com
+/// segurança a qual usuário o evento pertence (`appUserId` pode ser nulo em
+/// eventos sem identidade de assinante — ex. `EXPERIMENT_ENROLLMENT`).
+/// `id` é o `event.id` da RevenueCat (chave natural, nunca gerado aqui):
+/// tentar inserir o mesmo id duas vezes falha por violação de unicidade —
+/// é exatamente esse erro que `RevenueCatWebhookService.handle` usa para
+/// detectar reentrega e responder 200 sem reprocessar (RevenueCat retenta
+/// até 5 vezes se não receber 200 — ver docs).
+model RevenueCatEvent {
+  id         String   @id
+  type       String
+  appUserId  String?
+  payload    Json
+  receivedAt DateTime @default(now())
+
+  @@index([appUserId])
+  @@map("revenuecat_events")
+}
+
+/// Etapa 17 (Observabilidade avançada — README raiz linha 241, "configurações
+/// e info do app") — espelha `AppSettings` do front
+/// (lib/data/models/app_settings.dart), 1 linha por usuário
+/// (`@@unique([userId])`, mesmo padrão 1:1 de `Session`/`ProxyConfig`).
+///
+/// Nunca criada no cadastro do usuário (não acopla `AuthService` a mais uma
+/// tabela) — `SettingsService.getSettings` cria a linha sob demanda, com os
+/// mesmos defaults do mock (`notificationsEnabled`/`soundEnabled` = true),
+/// na primeira leitura, igual `SessionService.getOrCreateSession`.
+model UserSettings {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  notificationsEnabled Boolean @default(true)
+  soundEnabled         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_settings")
+}
