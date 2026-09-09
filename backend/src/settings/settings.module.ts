@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { HealthModule } from '../health/health.module';
 import { AppInfoService } from './app-info.service';
 import { SettingsController } from './settings.controller';
@@ -12,7 +13,7 @@ import { SettingsService } from './settings.service';
  * `AppInfoService.getAppInfo` — ver comentário de `HealthModule.exports`.
  */
 @Module({
-  imports: [ConfigModule, HealthModule],
+  imports: [ConfigModule, JwtModule.register({}), HealthModule],
   controllers: [SettingsController],
   providers: [SettingsService, AppInfoService],
 })

@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { PlansModule } from '../plans/plans.module';
 import { SendingModule } from '../sending/sending.module';
 import { CampaignsController } from './campaigns.controller';
@@ -34,7 +35,7 @@ import { S3MediaStorageProvider } from './s3-media-storage.provider';
  * de nada daqui de volta, então não é um ciclo de módulos.
  */
 @Module({
-  imports: [ConfigModule, forwardRef(() => SendingModule), PlansModule],
+  imports: [ConfigModule, JwtModule.register({}), forwardRef(() => SendingModule), PlansModule],
   controllers: [CampaignsController],
   providers: [
     CampaignsService,

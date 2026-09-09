@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { ContactsController } from './contacts.controller';
 import { ContactsService } from './contacts.service';
@@ -17,7 +18,7 @@ import { ValidateNumbersWorker } from './validate-numbers.worker';
  * tarde (README §10) sem tocar em `ContactsService`/`ContactsController`.
  */
 @Module({
-  imports: [ConfigModule, WhatsAppModule],
+  imports: [ConfigModule, JwtModule.register({}), WhatsAppModule],
   controllers: [ContactsController],
   providers: [PhoneNumberService, ValidateNumbersQueueService, ValidateNumbersWorker, ContactsService],
   exports: [ContactsService, PhoneNumberService],
