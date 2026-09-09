@@ -9,6 +9,7 @@ RUN npm ci
 # ---- build: gera o Prisma client e compila TS -> JS ----
 FROM node:20-alpine AS build
 WORKDIR /app
+RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
@@ -26,6 +27,7 @@ COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apk add --no-cache openssl
 RUN addgroup -S zabot && adduser -S zabot -G zabot
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
