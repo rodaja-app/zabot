@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:rive/rive.dart';
+import 'package:rive/rive.dart' hide Image;
 
 import '../../data/connection_repository.dart';
 import '../../data/models/home_stats.dart';
