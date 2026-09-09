@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { PlansController } from './plans.controller';
 import { PlansService } from './plans.service';
 import { RevenueCatApiService } from './revenuecat-api.service';
@@ -15,7 +16,7 @@ import { RevenueCatWebhookService } from './revenuecat-webhook.service';
  * só em `campaigns.module.ts`, que importa este módulo normalmente.
  */
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, JwtModule.register({})],
   controllers: [PlansController],
   providers: [PlansService, RevenueCatApiService, RevenueCatWebhookService],
   exports: [PlansService],
