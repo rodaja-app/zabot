@@ -42,6 +42,26 @@ export interface RevenueCatWebhookPayload {
   event: RevenueCatWebhookEvent;
 }
 
+/**
+ * Patch parcial de `Subscription` só com tipos escalares "planos" — deliberadamente
+ * não usa `Prisma.SubscriptionUpdateInput` porque esse tipo aceita tanto o valor
+ * escalar quanto o wrapper `XxxFieldUpdateOperationsInput` (ex.: `{ set: ... }`),
+ * o que o torna incompatível com `Prisma.SubscriptionUncheckedCreateInput` (usado
+ * no `create:` do upsert em `upsertSubscription`, que só aceita o valor escalar).
+ */
+interface SubscriptionPatch {
+  lastEventType: string;
+  lastEventAt: Date;
+  store: string | undefined;
+  environment: 'SANDBOX' | 'PRODUCTION' | undefined;
+  originalTransactionId: string | undefined;
+  plan?: { connect: { id: string } };
+  currentPeriodStart?: Date;
+  currentPeriodEnd?: Date;
+  status?: SubscriptionStatus;
+  autoRenew?: boolean;
+}
+
 /** Tipos de evento cuja ocorrência representa dinheiro de fato mudando de mãos (ou uma tentativa que falhou) — os únicos que viram `PaymentHistoryEntry` (README raiz "Etapa 16"). */
 const FINANCIAL_EVENT_TYPES: Record<string, PaymentStatus> = {
   INITIAL_PURCHASE: PaymentStatus.PAGO,
@@ -244,8 +264,8 @@ export class RevenueCatWebhookService {
    * assinatura; a RevenueCat manda `EXPIRATION` separadamente se o problema
    * de cobrança não se resolver dentro do período de graça da loja).
    */
-  private buildSubscriptionPatch(event: RevenueCatWebhookEvent, planId: string | undefined): Prisma.SubscriptionUpdateInput {
-    const patch: Prisma.SubscriptionUpdateInput = {
+  private buildSubscriptionPatch(event: RevenueCatWebhookEvent, planId: string | undefined): SubscriptionPatch {
+    const patch: SubscriptionPatch = {
       lastEventType: event.type,
       lastEventAt: new Date(event.event_timestamp_ms),
       store: event.store,

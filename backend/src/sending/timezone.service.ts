@@ -56,7 +56,7 @@ export class TimezoneService {
   /** Offset UTC (em horas, ex.: -3) a partir do DDD extraído de `55DDDassinante`. `undefined`/formato inesperado cai no padrão UTC-3. */
   offsetFor(normalizedPhone: string | null | undefined): number {
     const ddd = normalizedPhone?.slice(2, 4);
-    return (ddd && DDD_UTC_OFFSET[ddd]) ?? DEFAULT_UTC_OFFSET;
+    return (ddd ? DDD_UTC_OFFSET[ddd] : undefined) ?? DEFAULT_UTC_OFFSET;
   }
 
   /** true se `now` (instante UTC) cai dentro de [SEND_WINDOW_START_HOUR, SEND_WINDOW_END_HOUR) no horário local do contato. */
