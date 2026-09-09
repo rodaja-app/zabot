@@ -6,6 +6,7 @@ import { envValidationSchema } from './config/env.validation';
 import { AppLoggingModule } from './common/logging/logging.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestContextMiddleware } from './common/context/request-context.middleware';
+import { RequestContextService } from './common/context/request-context.service';
 import { SecurityModule } from './common/security/security.module';
 import { EmailModule } from './email/email.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -51,6 +52,8 @@ import { MetricsModule } from './metrics/metrics.module';
     // Único ponto de captura de erro da API inteira — ver all-exceptions.filter.ts.
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    RequestContextMiddleware,
+    RequestContextService,
   ],
 })
 export class AppModule implements NestModule {
