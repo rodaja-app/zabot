@@ -11,9 +11,10 @@ import 'auth_token_store.dart';
 /// classe em vez de falar com `http` diretamente, do mesmo jeito que hoje
 /// nenhuma tela fala com um repositório de mock além da interface abstrata.
 ///
-/// URL base configurável via `--dart-define=API_BASE_URL=...` (plumbing
-/// definitiva na tarefa "wiring final + config de ambiente"); o default
-/// aponta pro backend local (`main.ts`: sem prefixo global, porta 3000).
+/// URL base configurável via `--dart-define=API_BASE_URL=...` — usar para
+/// apontar pro backend local (`main.ts`: sem prefixo global, porta 3000)
+/// durante desenvolvimento. Sem o dart-define, o padrão é o backend de
+/// produção no Railway.
 class ApiClient {
   ApiClient({
     http.Client? httpClient,
