@@ -3,7 +3,7 @@
  * (lib/data/models/app_info.dart) reaproveita — o próprio comentário do
  * front já define os nomes em português usados aqui: "`connected` =
  * operacional, `pending` = degradado, `failed` = fora do ar". Mesma
- * convenção do resto do backend (`SessionStatus`, `SubscriptionStatus`):
+ * convenção do resto do backend (`SessionStatus`, `WalletTransactionStatus`):
  * enum em português no DTO, o mapeamento para `AppStatus.connected/pending/failed`
  * fica na camada de integração (etapa 18).
  */

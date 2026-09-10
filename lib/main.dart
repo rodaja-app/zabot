@@ -1,44 +1,25 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
 
 import 'data/api/api_client.dart';
 import 'data/api/auth_token_store.dart';
-import 'data/api/jwt_utils.dart';
 import 'data/api/realtime_client.dart';
 import 'data/api_auth_repository.dart';
 import 'data/api_connection_repository.dart';
 import 'data/api_contact_repository.dart';
 import 'data/api_menu_repository.dart';
 import 'data/api_message_repository.dart';
+import 'data/api_wallet_repository.dart';
 import 'data/auth_repository.dart';
 import 'data/connection_repository.dart';
 import 'data/contact_repository.dart';
 import 'data/menu_repository.dart';
 import 'data/message_repository.dart';
+import 'data/wallet_repository.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
-
-/// Chave de API do RevenueCat — diferente por loja (App Store/Play Store),
-/// por isso duas dart-defines em vez de uma (README RevenueCat: "each
-/// platform has its own API key"). Preenchidas em build/run time, ex.:
-/// `flutter run --dart-define=REVENUECAT_API_KEY_IOS=... --dart-define=REVENUECAT_API_KEY_ANDROID=...`
-/// Pendência do usuário: pegar as chaves reais no dashboard do RevenueCat.
-String _revenueCatApiKey() {
-  const iosKey = String.fromEnvironment('REVENUECAT_API_KEY_IOS');
-  const androidKey = String.fromEnvironment('REVENUECAT_API_KEY_ANDROID');
-  final key = Platform.isIOS ? iosKey : androidKey;
-  assert(
-    key.isNotEmpty,
-    'Faltou passar --dart-define=REVENUECAT_API_KEY_${Platform.isIOS ? 'IOS' : 'ANDROID'}=... '
-    '(chave do dashboard do RevenueCat).',
-  );
-  return key;
-}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,18 +28,7 @@ Future<void> main() async {
   final apiClient = ApiClient(tokenStore: tokenStore);
   final realtimeClient = RealtimeClient(baseUrl: apiClient.baseUrl, tokenStore: tokenStore);
 
-  // Identifica o RevenueCat com o mesmo id que assina os tokens (`sub` do
-  // JWT — ver doc de `ApiMenuRepository`/`ApiAuthRepository._identifyRevenueCat`)
-  // já no boot, para uma sessão retomada (usuário não passou por
-  // login/confirmCode nesta execução) também poder comprar/ver o plano
-  // corretamente na tela de Menu.
   final hasSession = await tokenStore.hasSession();
-  final accessToken = hasSession ? await tokenStore.accessToken : null;
-  final appUserId = accessToken != null ? subjectFromJwt(accessToken) : null;
-
-  final configuration = PurchasesConfiguration(_revenueCatApiKey());
-  if (appUserId != null) configuration.appUserID = appUserId;
-  await Purchases.configure(configuration);
 
   runApp(ZaBotApp(
     hasSession: hasSession,
@@ -67,6 +37,7 @@ Future<void> main() async {
     messageRepository: ApiMessageRepository(apiClient, realtimeClient),
     contactRepository: ApiContactRepository(apiClient),
     menuRepository: ApiMenuRepository(apiClient),
+    walletRepository: ApiWalletRepository(apiClient),
   ));
 }
 
@@ -79,6 +50,7 @@ class ZaBotApp extends StatelessWidget {
     required this.messageRepository,
     required this.contactRepository,
     required this.menuRepository,
+    required this.walletRepository,
   });
 
   final bool hasSession;
@@ -87,6 +59,7 @@ class ZaBotApp extends StatelessWidget {
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
   final MenuRepository menuRepository;
+  final WalletRepository walletRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -115,6 +88,7 @@ class ZaBotApp extends StatelessWidget {
               messageRepository: messageRepository,
               contactRepository: contactRepository,
               menuRepository: menuRepository,
+              walletRepository: walletRepository,
             )
           : LoginScreen(
               authRepository: authRepository,
@@ -122,6 +96,7 @@ class ZaBotApp extends StatelessWidget {
               messageRepository: messageRepository,
               contactRepository: contactRepository,
               menuRepository: menuRepository,
+              walletRepository: walletRepository,
             ),
     );
   }

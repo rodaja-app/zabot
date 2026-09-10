@@ -9,8 +9,8 @@ import { SettingsService } from './settings.service';
 /**
  * Etapa 17 (Observabilidade avançada — README raiz §17/linha 241). Espelha
  * `MenuRepository.getSettings/updateSettings/getAppInfo` (front) — 3 rotas,
- * todas atrás de `JwtAuthGuard` (mesmo padrão de `PlansController`: guard
- * por rota, não por controller, já que aqui não há nenhuma rota pública).
+ * todas atrás de `JwtAuthGuard` (guard por rota, não por controller, já que
+ * aqui não há nenhuma rota pública).
  */
 @Controller()
 export class SettingsController {

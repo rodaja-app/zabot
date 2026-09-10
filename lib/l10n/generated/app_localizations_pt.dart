@@ -541,67 +541,110 @@ class AppLocalizationsPt extends AppLocalizations {
   String get menu_account_logout_button => 'Sair';
 
   @override
-  String get menu_plan_card_title => 'Plano e assinatura';
+  String get wallet_card_title => 'Carteira de créditos';
 
   @override
-  String get menu_plan_status_active => 'Ativo';
-
-  @override
-  String get menu_plan_status_trial => 'Período de teste';
-
-  @override
-  String get menu_plan_status_expired => 'Expirado';
-
-  @override
-  String menu_plan_renews_on(String date) {
-    return 'Renova em $date';
+  String wallet_card_balance_label(int balance) {
+    return '$balance créditos disponíveis';
   }
 
   @override
-  String menu_plan_usage_label(int used, int limit) {
-    return '$used de $limit mensagens usadas este mês';
+  String get wallet_recharge_screen_title => 'Recarregar créditos';
+
+  @override
+  String get wallet_packages_section_title => 'Escolha um pacote';
+
+  @override
+  String wallet_package_credits_label(int credits) {
+    return '$credits créditos';
   }
 
   @override
-  String get menu_plan_compare_button => 'Comparar planos';
-
-  @override
-  String get menu_plan_change_button => 'Assinar/alterar plano';
-
-  @override
-  String get menu_plan_payment_history_button => 'Histórico de pagamentos';
-
-  @override
-  String get menu_plan_compare_dialog_title => 'Comparar planos';
-
-  @override
-  String get menu_plan_change_dialog_title => 'Assinar/alterar plano';
-
-  @override
-  String get menu_plan_payment_history_dialog_title =>
-      'Histórico de pagamentos';
-
-  @override
-  String get menu_plan_payment_history_empty =>
-      'Nenhum pagamento registrado ainda.';
-
-  @override
-  String get menu_plan_payment_status_paid => 'Pago';
-
-  @override
-  String get menu_plan_payment_status_pending => 'Pendente';
-
-  @override
-  String get menu_plan_payment_status_failed => 'Recusado';
-
-  @override
-  String menu_plan_description(int limit) {
-    return 'Até $limit mensagens por mês.';
+  String wallet_package_bonus_label(int bonusPercent) {
+    return '+$bonusPercent% de bônus';
   }
 
   @override
-  String get menu_plan_purchase_error =>
-      'Não foi possível concluir a compra. Tente novamente.';
+  String get wallet_create_recharge_error =>
+      'Não foi possível gerar a cobrança Pix. Tente novamente.';
+
+  @override
+  String wallet_pix_amount_label(String priceLabel, int credits) {
+    return '$priceLabel · $credits créditos';
+  }
+
+  @override
+  String get wallet_pix_instructions =>
+      'Escaneie o QR code com o app do seu banco ou copie o código Pix abaixo para concluir o pagamento.';
+
+  @override
+  String get wallet_pix_copy_button => 'Copiar código Pix';
+
+  @override
+  String get wallet_pix_copied_message => 'Código Pix copiado!';
+
+  @override
+  String get wallet_pix_waiting_label =>
+      'Aguardando confirmação do pagamento...';
+
+  @override
+  String get wallet_success_title => 'Pagamento confirmado!';
+
+  @override
+  String wallet_success_message(int credits) {
+    return '$credits créditos adicionados à sua carteira.';
+  }
+
+  @override
+  String get wallet_success_button => 'Concluir';
+
+  @override
+  String get wallet_method_choice_title => 'Como você quer pagar?';
+
+  @override
+  String get wallet_method_pix_label => 'Pix';
+
+  @override
+  String get wallet_method_pix_description => 'Pagamento instantâneo via QR code';
+
+  @override
+  String get wallet_method_card_label => 'Cartão de crédito';
+
+  @override
+  String get wallet_method_card_description => 'Pagamento à vista, aprovação na hora';
+
+  @override
+  String get wallet_card_form_title => 'Dados do cartão';
+
+  @override
+  String get wallet_card_number_label => 'Número do cartão';
+
+  @override
+  String get wallet_card_holder_name_label => 'Nome impresso no cartão';
+
+  @override
+  String get wallet_card_expiry_month_label => 'Mês (MM)';
+
+  @override
+  String get wallet_card_expiry_year_label => 'Ano (AA)';
+
+  @override
+  String get wallet_card_cvv_label => 'CVV';
+
+  @override
+  String get wallet_card_cpf_label => 'CPF do titular';
+
+  @override
+  String get wallet_card_submit_button => 'Pagar';
+
+  @override
+  String get wallet_card_processing_label => 'Processando pagamento...';
+
+  @override
+  String get wallet_card_form_invalid_error => 'Preencha todos os campos corretamente antes de continuar.';
+
+  @override
+  String get wallet_card_generic_error => 'Não foi possível concluir o pagamento com cartão. Tente novamente ou use Pix.';
 
   @override
   String get menu_settings_card_title => 'Configurações';

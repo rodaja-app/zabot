@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CampaignMediaType, CampaignStatus, Prisma } from '@prisma/client';
-import { PlansService } from '../plans/plans.service';
+import { CampaignMediaType, CampaignStatus, Prisma, WalletTransactionType } from '@prisma/client';
+import { InsufficientBalanceError } from '../common/errors/app-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageQueueService } from '../sending/send-message.queue';
 import { SendMessageWorker } from '../sending/send-message.worker';
@@ -29,7 +29,6 @@ export class CampaignsService {
     private readonly prisma: PrismaService,
     private readonly sendQueue: SendMessageQueueService,
     private readonly sendWorker: SendMessageWorker,
-    private readonly plansService: PlansService,
   ) {}
 
   async getCampaigns(userId: string): Promise<CampaignDto[]> {
@@ -95,15 +94,16 @@ export class CampaignsService {
         }
       }
 
-      // Etapa 16 ("Bloquear novos envios") — check + incremento de
-      // `Subscription.messagesUsed` DENTRO desta mesma transação, antes de
-      // `Envio.createMany`: se estourar o limite, `assertWithinUsageLimit`
-      // lança e a transação inteira (campanha, mensagens, mídia,
-      // destinatários já persistidos acima) faz rollback — nenhuma campanha
-      // "parcial" fica salva. `envios.length` = destinatários × mensagens,
-      // igual à contagem feita para `Campaign.recipientCount` (enfileirado,
-      // não entregue).
-      await this.plansService.assertWithinUsageLimit(tx, userId, envios.length);
+      // Carteira de créditos ("tudo ou nada", decisão do usuário) — check +
+      // débito de `Wallet.balance` DENTRO desta mesma transação, antes de
+      // `Envio.createMany`: se o saldo não cobrir a campanha inteira,
+      // `debitWalletOrThrow` lança e a transação inteira (campanha,
+      // mensagens, mídia, destinatários já persistidos acima) faz rollback —
+      // nenhuma campanha "parcial" fica salva, e nenhum crédito é debitado
+      // sem a campanha ser criada de verdade. `envios.length` = destinatários
+      // × mensagens, igual à contagem feita para `Campaign.recipientCount`
+      // (enfileirado, não entregue) — 1 crédito por `Envio`.
+      await this.debitWalletOrThrow(tx, userId, envios.length, campaign.id);
 
       await tx.envio.createMany({ data: envios });
 
@@ -149,6 +149,58 @@ export class CampaignsService {
     }
     const contacts = await tx.contact.findMany({ where, select: { id: true } });
     return contacts.map((c) => c.id);
+  }
+
+  /**
+   * Débito "tudo ou nada" da carteira de créditos, dentro da mesma transação
+   * que cria a campanha (ver comentário em `createCampaign` acima). Usuário
+   * sem `Wallet` (nunca recarregou) é tratado como saldo 0 — mesma filosofia
+   * de "nunca inventar acesso sem dado que confirme" já usada em
+   * `ContactStatus`/`EnvioStatus`. 1 crédito = 1 `Envio` (destinatário ×
+   * mensagem), nunca uma fração — se o saldo não cobrir a campanha inteira,
+   * nada é debitado e nenhum `Envio` é criado (rollback da transação inteira).
+   *
+   * O `updateMany` com `balance: wallet.balance` na cláusula `where` funciona
+   * como compare-and-swap: se outra transação concorrente já tiver alterado o
+   * saldo entre o `findUnique` acima e este `update` (mesmo sob READ
+   * COMMITTED), `count` vem 0 e a chamada falha em vez de debitar duas vezes
+   * ou deixar o saldo ir negativo silenciosamente.
+   */
+  private async debitWalletOrThrow(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    quantity: number,
+    campaignId: string,
+  ): Promise<void> {
+    if (quantity <= 0) return;
+
+    const wallet = await tx.wallet.findUnique({ where: { userId } });
+    const balance = wallet?.balance ?? 0;
+
+    if (!wallet || quantity > balance) {
+      throw new InsufficientBalanceError(
+        `Saldo insuficiente para esta campanha (necessário ${quantity} créditos, disponível ${balance}).`,
+        { userId, balance, requested: quantity },
+      );
+    }
+
+    const updated = await tx.wallet.updateMany({
+      where: { userId, balance: wallet.balance },
+      data: { balance: { decrement: quantity } },
+    });
+    if (updated.count === 0) {
+      throw new InsufficientBalanceError('Conflito ao debitar créditos da carteira — tente novamente.', { userId });
+    }
+
+    await tx.walletTransaction.create({
+      data: {
+        walletId: wallet.id,
+        userId,
+        type: WalletTransactionType.CONSUMO,
+        credits: quantity,
+        campaignId,
+      },
+    });
   }
 
   /**

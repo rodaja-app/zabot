@@ -4,7 +4,9 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module';
 import { EMAIL_PROVIDER } from '../../src/email/email-provider.interface';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { MercadoPagoApiService } from '../../src/wallet/mercado-pago-api.service';
 import { WhatsAppProvider } from '../../src/whatsapp/whatsapp-provider.interface';
+import { FakeMercadoPagoApiService } from './fake-mercado-pago-api.provider';
 import { FakeWhatsAppProvider } from './fake-whatsapp.provider';
 import { TestEmailProvider } from './test-email.provider';
 
@@ -13,6 +15,7 @@ export interface E2eContext {
   prisma: PrismaService;
   whatsapp: FakeWhatsAppProvider;
   email: TestEmailProvider;
+  mercadoPago: FakeMercadoPagoApiService;
 }
 
 /**
@@ -30,10 +33,15 @@ export interface E2eContext {
  *    em `/auth/register`, `/auth/confirm-code` etc. (limites de
  *    5-10/min/IP) sem tomar 429 por causa da velocidade do próprio teste,
  *    não de um bug.
+ *  - `MercadoPagoApiService` → `FakeMercadoPagoApiService` (sem isso,
+ *    `WalletService.createRecharge` chamaria a API REAL do Mercado Pago com
+ *    as credenciais de produção do `.env`, criando uma cobrança Pix de
+ *    verdade a cada teste).
  *
- * `rawBody: true` replica o bootstrap de `main.ts` — obrigatório para
- * `plans.e2e-spec.ts` (verificação HMAC do webhook RevenueCat precisa dos
- * bytes crus do corpo). O `ValidationPipe` global também é o mesmo.
+ * `rawBody: true` replica o bootstrap de `main.ts` — reservado para a
+ * verificação de assinatura do webhook de pagamento Pix/Mercado Pago
+ * (carteira de créditos), que vai precisar dos bytes crus do corpo. O
+ * `ValidationPipe` global também é o mesmo.
  */
 export async function buildE2eApp(): Promise<E2eContext> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -41,6 +49,8 @@ export async function buildE2eApp(): Promise<E2eContext> {
     .useClass(FakeWhatsAppProvider)
     .overrideProvider(EMAIL_PROVIDER)
     .useClass(TestEmailProvider)
+    .overrideProvider(MercadoPagoApiService)
+    .useClass(FakeMercadoPagoApiService)
     .overrideGuard(ThrottlerGuard)
     .useValue({ canActivate: () => true })
     .compile();
@@ -60,23 +70,24 @@ export async function buildE2eApp(): Promise<E2eContext> {
     prisma: moduleRef.get(PrismaService),
     whatsapp: moduleRef.get(WhatsAppProvider) as unknown as FakeWhatsAppProvider,
     email: moduleRef.get(EMAIL_PROVIDER) as unknown as TestEmailProvider,
+    mercadoPago: moduleRef.get(MercadoPagoApiService) as unknown as FakeMercadoPagoApiService,
   };
 }
 
 /**
- * Popula o catálogo de planos direto (mesmos valores de `prisma/seed.ts`,
- * `upsert` por `key` — idempotente) em vez de depender de `npm run
- * prisma:seed` já ter rodado no banco de teste: os specs que precisam de um
- * plano (campaigns, plans) ficam auto-contidos, sem pré-requisito externo
- * além de "banco migrado com as RLS policies aplicadas".
+ * Credita a carteira de um usuário direto via `withTenantContext` (RLS exige
+ * tenant context — mesmo padrão de escrita que `CampaignsService.debitWalletOrThrow`
+ * usa em produção, só que somando em vez de subtraindo). `upsert` porque o
+ * usuário pode nunca ter tido uma `Wallet` ainda (criada sob demanda, nunca
+ * no cadastro) — specs que precisam de saldo (campaigns) ficam
+ * auto-contidos, sem depender de um seed externo.
  */
-export async function ensurePlansSeeded(prisma: PrismaService): Promise<void> {
-  const plans = [
-    { key: 'basico', name: 'Plano Básico', priceLabel: 'R$ 39,90/mês', messagesLimit: 1000, revenueCatProductId: 'zabot_basico_mensal' },
-    { key: 'pro', name: 'Plano Pro', priceLabel: 'R$ 99,90/mês', messagesLimit: 5000, revenueCatProductId: 'zabot_pro_mensal' },
-    { key: 'premium', name: 'Plano Premium', priceLabel: 'R$ 199,90/mês', messagesLimit: 15000, revenueCatProductId: 'zabot_premium_mensal' },
-  ];
-  for (const plan of plans) {
-    await prisma.plan.upsert({ where: { key: plan.key }, update: plan, create: plan });
-  }
+export async function creditWalletForTests(prisma: PrismaService, userId: string, credits: number): Promise<void> {
+  await prisma.withTenantContext(userId, (tx) =>
+    tx.wallet.upsert({
+      where: { userId },
+      update: { balance: { increment: credits } },
+      create: { userId, balance: credits },
+    }),
+  );
 }

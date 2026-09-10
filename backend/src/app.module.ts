@@ -16,9 +16,9 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { SendingModule } from './sending/sending.module';
-import { PlansModule } from './plans/plans.module';
 import { SettingsModule } from './settings/settings.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { WalletModule } from './wallet/wallet.module';
 
 @Module({
   imports: [
@@ -44,9 +44,9 @@ import { MetricsModule } from './metrics/metrics.module';
     ContactsModule,
     CampaignsModule,
     SendingModule,
-    PlansModule,
     SettingsModule,
     MetricsModule,
+    WalletModule,
   ],
   providers: [
     // Único ponto de captura de erro da API inteira — ver all-exceptions.filter.ts.

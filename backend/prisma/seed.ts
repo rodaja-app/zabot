@@ -1,62 +1,23 @@
-import { PrismaClient } from '@prisma/client';
-
 /**
- * Etapa 16 (Planos e uso) — popula o catálogo ESTÁTICO de planos (ver
- * comentário do model `Plan` em schema.prisma). `upsert` por `key` torna o
- * script idempotente: rodar de novo depois de ajustar um preço/limite só
- * atualiza a linha existente, nunca duplica.
+ * Sem catálogo estático para popular hoje — o antigo seed de planos
+ * (RevenueCat/assinatura mensal) foi removido junto com `Plan`/`Subscription`
+ * (ver comentário do model `Wallet` em schema.prisma). Carteira de créditos
+ * não tem catálogo: `Wallet` é criada sob demanda (saldo 0) na primeira vez
+ * que o usuário precisa dela, mesmo padrão de `UserSettings`/`Session`
+ * (`getOrCreate*`), nunca por seed.
  *
- * `revenueCatProductId` aqui são placeholders — trocar pelos `product_id`
- * reais configurados no dashboard da RevenueCat (Products) antes de ir para
- * produção; não há como o backend adivinhar esse valor (ele é definido do
- * lado da RevenueCat/lojas, não neste projeto).
- *
- * Rodar com: npm run prisma:seed (ver package.json — usa `prisma db seed`,
- * que por sua vez chama este arquivo via ts-node).
+ * Mantido como no-op (em vez de apagar o arquivo) para não quebrar
+ * `npm run prisma:seed` / `prisma db seed` (ver package.json) caso algum
+ * catálogo global volte a existir no futuro (ex.: tabela de preços da
+ * recarga Pix, se deixar de ser hardcoded no backend).
  */
-const PLANS = [
-  {
-    key: 'basico',
-    name: 'Plano Básico',
-    priceLabel: 'R$ 39,90/mês',
-    messagesLimit: 1000,
-    revenueCatProductId: 'zabot_basico_mensal',
-  },
-  {
-    key: 'pro',
-    name: 'Plano Pro',
-    priceLabel: 'R$ 99,90/mês',
-    messagesLimit: 5000,
-    revenueCatProductId: 'zabot_pro_mensal',
-  },
-  {
-    key: 'premium',
-    name: 'Plano Premium',
-    priceLabel: 'R$ 199,90/mês',
-    messagesLimit: 15000,
-    revenueCatProductId: 'zabot_premium_mensal',
-  },
-];
-
 async function main(): Promise<void> {
-  const prisma = new PrismaClient();
-  try {
-    for (const plan of PLANS) {
-      await prisma.plan.upsert({
-        where: { key: plan.key },
-        update: plan,
-        create: plan,
-      });
-    }
-    // eslint-disable-next-line no-console
-    console.log(`Seed de planos concluído (${PLANS.length} planos).`);
-  } finally {
-    await prisma.$disconnect();
-  }
+  // eslint-disable-next-line no-console
+  console.log('Nenhum seed necessário no momento (sem catálogo estático — ver comentário acima).');
 }
 
 main().catch((err) => {
   // eslint-disable-next-line no-console
-  console.error('Falha ao rodar o seed de planos:', err);
+  console.error('Falha ao rodar o seed:', err);
   process.exit(1);
 });

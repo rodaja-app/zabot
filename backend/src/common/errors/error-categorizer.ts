@@ -112,10 +112,12 @@ function statusForCategory(category: ErrorCategory): number {
     case ErrorCategory.SESSAO_DESCONECTADA:
       return 409;
     case ErrorCategory.PAGAMENTO:
-      // Cobre tanto "limite de mensagens do plano atingido" (bloqueio de novo
-      // envio) quanto falha de autenticação/assinatura de webhook da
-      // RevenueCat — em ambos os casos 402 é mais preciso que 500/401
-      // genéricos (nunca é erro do servidor, e não é o JWT do próprio ZaBot).
+      // Cobre tanto "saldo insuficiente na carteira" (bloqueio de criação de
+      // campanha, InsufficientBalanceError) quanto falha ao criar/consultar
+      // cobrança Pix ou webhook do Mercado Pago com assinatura/header
+      // inválido (PixPaymentError) — em ambos os casos 402 é mais preciso
+      // que 500/401 genéricos (nunca é erro do servidor, e não é o JWT do
+      // próprio ZaBot).
       return 402;
     default:
       return 500;

@@ -5,6 +5,7 @@ import '../data/connection_repository.dart';
 import '../data/contact_repository.dart';
 import '../data/menu_repository.dart';
 import '../data/message_repository.dart';
+import '../data/wallet_repository.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../widgets/zabot_bottom_nav.dart';
 import 'home/inicio_screen.dart';
@@ -22,6 +23,7 @@ class RootShellScreen extends StatefulWidget {
     required this.messageRepository,
     required this.contactRepository,
     required this.menuRepository,
+    required this.walletRepository,
   });
 
   final AuthRepository authRepository;
@@ -29,6 +31,7 @@ class RootShellScreen extends StatefulWidget {
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
   final MenuRepository menuRepository;
+  final WalletRepository walletRepository;
 
   @override
   State<RootShellScreen> createState() => _RootShellScreenState();
@@ -65,6 +68,7 @@ class _RootShellScreenState extends State<RootShellScreen> {
         authRepository: widget.authRepository,
         messageRepository: widget.messageRepository,
         contactRepository: widget.contactRepository,
+        walletRepository: widget.walletRepository,
       ),
     ];
 

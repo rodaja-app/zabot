@@ -36,6 +36,14 @@ class ApiException implements Exception {
   bool get isValidation => statusCode == 400 || statusCode == 422;
   bool get isRateLimit => statusCode == 429;
 
+  /// `ErrorCategory.PAGAMENTO` (backend `error-categorizer.ts`) → HTTP 402 —
+  /// usado tanto pela recusa de cartão (`CardPaymentRejectedError`) quanto
+  /// por falhas do Mercado Pago ao criar a cobrança Pix (`PixPaymentError`).
+  /// Ao contrário das outras categorias, aqui a tela mostra [message] direto
+  /// (não uma mensagem localizada genérica): o backend já monta um texto
+  /// específico e apresentável (ex.: "Cartão recusado: CVV inválido.").
+  bool get isPaymentRejected => statusCode == 402;
+
   @override
   String toString() => 'ApiException($statusCode $category: $message)';
 }

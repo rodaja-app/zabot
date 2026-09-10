@@ -57,22 +57,22 @@ export class MediaStorageError extends AppError {
   }
 }
 
-/** Etapa 16 — REST API da RevenueCat indisponível, retornou erro, ou `REVENUECAT_SECRET_API_KEY` ausente/inválida. */
-export class RevenueCatApiError extends AppError {
+/** Carteira/créditos (substitui o antigo modelo de assinatura RevenueCat) — saldo insuficiente para cobrir a campanha inteira ("tudo ou nada": nenhum envio parcial é enfileirado), ou webhook de pagamento Pix/Mercado Pago com assinatura inválida. */
+export class InsufficientBalanceError extends AppError {
   constructor(message: string, details?: Record<string, unknown>, cause?: unknown) {
     super(message, ErrorCategory.PAGAMENTO, details, cause);
   }
 }
 
-/** Etapa 16 — webhook da RevenueCat sem header de Authorization esperado, ou (quando configurada) assinatura HMAC inválida/expirada. */
-export class RevenueCatWebhookAuthError extends AppError {
+/** Cobrança Pix/Mercado Pago: falha ao criar o pagamento na API deles, credenciais ausentes/inválidas, ou webhook com assinatura/header inválido. */
+export class PixPaymentError extends AppError {
   constructor(message: string, details?: Record<string, unknown>, cause?: unknown) {
     super(message, ErrorCategory.PAGAMENTO, details, cause);
   }
 }
 
-/** Etapa 16 — usuário sem plano usável (sem `Subscription` ou `status = EXPIRADA`) ou que atingiria `Plan.messagesLimit` com o envio pedido. */
-export class UsageLimitExceededError extends AppError {
+/** Cartão de crédito recusado pelo Mercado Pago (`status: 'rejected'`) — mensagem carrega o `status_detail` (ex.: saldo insuficiente, CVV inválido) para o app mostrar algo específico em vez de um erro genérico. */
+export class CardPaymentRejectedError extends AppError {
   constructor(message: string, details?: Record<string, unknown>, cause?: unknown) {
     super(message, ErrorCategory.PAGAMENTO, details, cause);
   }

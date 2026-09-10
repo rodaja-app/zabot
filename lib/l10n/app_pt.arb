@@ -650,95 +650,157 @@
   "@menu_account_logout_button": {
     "description": "Botão de logout na Tela Menu"
   },
-  "menu_plan_card_title": "Plano e assinatura",
-  "@menu_plan_card_title": {
-    "description": "Título do card de plano/assinatura na Tela Menu"
+  "wallet_card_title": "Carteira de créditos",
+  "@wallet_card_title": {
+    "description": "Título do card de carteira na Tela Menu"
   },
-  "menu_plan_status_active": "Ativo",
-  "@menu_plan_status_active": {
-    "description": "Rótulo de status quando o plano está ativo"
-  },
-  "menu_plan_status_trial": "Período de teste",
-  "@menu_plan_status_trial": {
-    "description": "Rótulo de status quando o plano está em período de teste"
-  },
-  "menu_plan_status_expired": "Expirado",
-  "@menu_plan_status_expired": {
-    "description": "Rótulo de status quando o plano expirou"
-  },
-  "menu_plan_renews_on": "Renova em {date}",
-  "@menu_plan_renews_on": {
-    "description": "Data da próxima renovação do plano",
+  "wallet_card_balance_label": "{balance} créditos disponíveis",
+  "@wallet_card_balance_label": {
+    "description": "Saldo atual exibido no card de carteira na Tela Menu",
     "placeholders": {
-      "date": {
+      "balance": {
+        "type": "int"
+      }
+    }
+  },
+  "wallet_recharge_screen_title": "Recarregar créditos",
+  "@wallet_recharge_screen_title": {
+    "description": "Título da tela de recarga de créditos"
+  },
+  "wallet_packages_section_title": "Escolha um pacote",
+  "@wallet_packages_section_title": {
+    "description": "Título da lista de pacotes de recarga"
+  },
+  "wallet_package_credits_label": "{credits} créditos",
+  "@wallet_package_credits_label": {
+    "description": "Quantidade de créditos de um pacote de recarga",
+    "placeholders": {
+      "credits": {
+        "type": "int"
+      }
+    }
+  },
+  "wallet_package_bonus_label": "+{bonusPercent}% de bônus",
+  "@wallet_package_bonus_label": {
+    "description": "Percentual de bônus de um pacote de recarga",
+    "placeholders": {
+      "bonusPercent": {
+        "type": "int"
+      }
+    }
+  },
+  "wallet_create_recharge_error": "Não foi possível gerar a cobrança Pix. Tente novamente.",
+  "@wallet_create_recharge_error": {
+    "description": "Mensagem exibida quando a criação da recarga Pix falha"
+  },
+  "wallet_pix_amount_label": "{priceLabel} · {credits} créditos",
+  "@wallet_pix_amount_label": {
+    "description": "Valor e créditos da cobrança Pix em andamento",
+    "placeholders": {
+      "priceLabel": {
         "type": "String"
-      }
-    }
-  },
-  "menu_plan_usage_label": "{used} de {limit} mensagens usadas este mês",
-  "@menu_plan_usage_label": {
-    "description": "Uso de mensagens do plano no mês corrente",
-    "placeholders": {
-      "used": {
-        "type": "int"
       },
-      "limit": {
+      "credits": {
         "type": "int"
       }
     }
   },
-  "menu_plan_compare_button": "Comparar planos",
-  "@menu_plan_compare_button": {
-    "description": "Botão que abre o diálogo de comparação de planos"
+  "wallet_pix_instructions": "Escaneie o QR code com o app do seu banco ou copie o código Pix abaixo para concluir o pagamento.",
+  "@wallet_pix_instructions": {
+    "description": "Instruções de pagamento exibidas junto ao QR code do Pix"
   },
-  "menu_plan_change_button": "Assinar/alterar plano",
-  "@menu_plan_change_button": {
-    "description": "Botão que abre o diálogo de troca de plano"
+  "wallet_pix_copy_button": "Copiar código Pix",
+  "@wallet_pix_copy_button": {
+    "description": "Botão que copia o código Pix copia-e-cola"
   },
-  "menu_plan_payment_history_button": "Histórico de pagamentos",
-  "@menu_plan_payment_history_button": {
-    "description": "Botão que abre o diálogo de histórico de pagamentos"
+  "wallet_pix_copied_message": "Código Pix copiado!",
+  "@wallet_pix_copied_message": {
+    "description": "Confirmação exibida após copiar o código Pix"
   },
-  "menu_plan_compare_dialog_title": "Comparar planos",
-  "@menu_plan_compare_dialog_title": {
-    "description": "Título do diálogo de comparação de planos"
+  "wallet_pix_waiting_label": "Aguardando confirmação do pagamento...",
+  "@wallet_pix_waiting_label": {
+    "description": "Mensagem exibida enquanto aguarda a confirmação do Pix"
   },
-  "menu_plan_change_dialog_title": "Assinar/alterar plano",
-  "@menu_plan_change_dialog_title": {
-    "description": "Título do diálogo de escolha de novo plano"
+  "wallet_success_title": "Pagamento confirmado!",
+  "@wallet_success_title": {
+    "description": "Título da tela de sucesso após a confirmação da recarga"
   },
-  "menu_plan_payment_history_dialog_title": "Histórico de pagamentos",
-  "@menu_plan_payment_history_dialog_title": {
-    "description": "Título do diálogo de histórico de pagamentos"
-  },
-  "menu_plan_payment_history_empty": "Nenhum pagamento registrado ainda.",
-  "@menu_plan_payment_history_empty": {
-    "description": "Mensagem quando não há pagamentos no histórico"
-  },
-  "menu_plan_payment_status_paid": "Pago",
-  "@menu_plan_payment_status_paid": {
-    "description": "Rótulo de status de um pagamento concluído"
-  },
-  "menu_plan_payment_status_pending": "Pendente",
-  "@menu_plan_payment_status_pending": {
-    "description": "Rótulo de status de um pagamento pendente"
-  },
-  "menu_plan_payment_status_failed": "Recusado",
-  "@menu_plan_payment_status_failed": {
-    "description": "Rótulo de status de um pagamento recusado"
-  },
-  "menu_plan_description": "Até {limit} mensagens por mês.",
-  "@menu_plan_description": {
-    "description": "Descrição de um plano no diálogo Comparar planos, a partir do limite de mensagens",
+  "wallet_success_message": "{credits} créditos adicionados à sua carteira.",
+  "@wallet_success_message": {
+    "description": "Mensagem de sucesso após a confirmação da recarga",
     "placeholders": {
-      "limit": {
+      "credits": {
         "type": "int"
       }
     }
   },
-  "menu_plan_purchase_error": "Não foi possível concluir a compra. Tente novamente.",
-  "@menu_plan_purchase_error": {
-    "description": "Mensagem exibida quando a compra nativa do plano falha (exceto cancelamento pelo usuário)"
+  "wallet_success_button": "Concluir",
+  "@wallet_success_button": {
+    "description": "Botão que fecha a tela de recarga após o sucesso"
+  },
+  "wallet_method_choice_title": "Como você quer pagar?",
+  "@wallet_method_choice_title": {
+    "description": "Título da etapa de escolha do método de pagamento (Pix ou cartão)"
+  },
+  "wallet_method_pix_label": "Pix",
+  "@wallet_method_pix_label": {
+    "description": "Rótulo da opção de pagamento via Pix"
+  },
+  "wallet_method_pix_description": "Pagamento instantâneo via QR code",
+  "@wallet_method_pix_description": {
+    "description": "Descrição da opção de pagamento via Pix"
+  },
+  "wallet_method_card_label": "Cartão de crédito",
+  "@wallet_method_card_label": {
+    "description": "Rótulo da opção de pagamento via cartão de crédito"
+  },
+  "wallet_method_card_description": "Pagamento à vista, aprovação na hora",
+  "@wallet_method_card_description": {
+    "description": "Descrição da opção de pagamento via cartão de crédito"
+  },
+  "wallet_card_form_title": "Dados do cartão",
+  "@wallet_card_form_title": {
+    "description": "Título do formulário de dados do cartão"
+  },
+  "wallet_card_number_label": "Número do cartão",
+  "@wallet_card_number_label": {
+    "description": "Rótulo do campo de número do cartão"
+  },
+  "wallet_card_holder_name_label": "Nome impresso no cartão",
+  "@wallet_card_holder_name_label": {
+    "description": "Rótulo do campo de nome do titular do cartão"
+  },
+  "wallet_card_expiry_month_label": "Mês (MM)",
+  "@wallet_card_expiry_month_label": {
+    "description": "Rótulo do campo de mês de validade do cartão"
+  },
+  "wallet_card_expiry_year_label": "Ano (AA)",
+  "@wallet_card_expiry_year_label": {
+    "description": "Rótulo do campo de ano de validade do cartão"
+  },
+  "wallet_card_cvv_label": "CVV",
+  "@wallet_card_cvv_label": {
+    "description": "Rótulo do campo de código de segurança do cartão"
+  },
+  "wallet_card_cpf_label": "CPF do titular",
+  "@wallet_card_cpf_label": {
+    "description": "Rótulo do campo de CPF do titular do cartão"
+  },
+  "wallet_card_submit_button": "Pagar",
+  "@wallet_card_submit_button": {
+    "description": "Botão que confirma o pagamento com cartão"
+  },
+  "wallet_card_processing_label": "Processando pagamento...",
+  "@wallet_card_processing_label": {
+    "description": "Mensagem exibida enquanto o pagamento com cartão está sendo processado"
+  },
+  "wallet_card_form_invalid_error": "Preencha todos os campos corretamente antes de continuar.",
+  "@wallet_card_form_invalid_error": {
+    "description": "Erro exibido quando o formulário de cartão tem campos inválidos ou incompletos"
+  },
+  "wallet_card_generic_error": "Não foi possível concluir o pagamento com cartão. Tente novamente ou use Pix.",
+  "@wallet_card_generic_error": {
+    "description": "Erro genérico exibido quando o pagamento com cartão falha por motivo não específico (rede, tokenização etc.)"
   },
   "menu_settings_card_title": "Configurações",
   "@menu_settings_card_title": {

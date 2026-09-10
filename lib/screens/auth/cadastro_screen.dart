@@ -5,6 +5,7 @@ import '../../data/connection_repository.dart';
 import '../../data/contact_repository.dart';
 import '../../data/menu_repository.dart';
 import '../../data/message_repository.dart';
+import '../../data/wallet_repository.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_page_route.dart';
@@ -25,6 +26,7 @@ class CadastroScreen extends StatefulWidget {
     required this.messageRepository,
     required this.contactRepository,
     required this.menuRepository,
+    required this.walletRepository,
   });
 
   final AuthRepository authRepository;
@@ -32,6 +34,7 @@ class CadastroScreen extends StatefulWidget {
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
   final MenuRepository menuRepository;
+  final WalletRepository walletRepository;
 
   @override
   State<CadastroScreen> createState() => _CadastroScreenState();
@@ -87,6 +90,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
           messageRepository: widget.messageRepository,
           contactRepository: widget.contactRepository,
           menuRepository: widget.menuRepository,
+          walletRepository: widget.walletRepository,
           email: email,
         ),
       ),
@@ -149,6 +153,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
                               messageRepository: widget.messageRepository,
                               contactRepository: widget.contactRepository,
                               menuRepository: widget.menuRepository,
+                              walletRepository: widget.walletRepository,
                             ),
                           ),
                         ),

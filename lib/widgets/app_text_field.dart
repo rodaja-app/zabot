@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 
@@ -14,6 +15,7 @@ class AppTextField extends StatelessWidget {
     this.onChanged,
     this.errorText,
     this.maxLines = 1,
+    this.inputFormatters,
   });
 
   final String label;
@@ -24,6 +26,10 @@ class AppTextField extends StatelessWidget {
   final String? errorText;
   final int maxLines;
 
+  /// Ex.: `[FilteringTextInputFormatter.digitsOnly]` para número de cartão,
+  /// CVV e CPF no formulário de recarga por cartão (Etapa 19).
+  final List<TextInputFormatter>? inputFormatters;
+
   @override
   Widget build(BuildContext context) {
     return TextField(
@@ -32,6 +38,7 @@ class AppTextField extends StatelessWidget {
       textInputAction: textInputAction,
       onChanged: onChanged,
       maxLines: maxLines,
+      inputFormatters: inputFormatters,
       style: const TextStyle(color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,

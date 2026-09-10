@@ -1,7 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { PlansModule } from '../plans/plans.module';
 import { SendingModule } from '../sending/sending.module';
 import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
@@ -30,12 +29,14 @@ import { S3MediaStorageProvider } from './s3-media-storage.provider';
  * (https://docs.nestjs.com/fundamentals/circular-dependency): `forwardRef`
  * nos dois `imports`, sem precisar de `forwardRef` nos construtores.
  *
- * `PlansModule` (etapa 16) importado sem `forwardRef` — `CampaignsService`
- * usa `PlansService.assertWithinUsageLimit`, mas `PlansModule` não depende
- * de nada daqui de volta, então não é um ciclo de módulos.
+ * O débito de créditos da carteira (`CampaignsService.debitWalletOrThrow`)
+ * acessa `Wallet`/`WalletTransaction` direto via `PrismaService`, dentro da
+ * mesma transação — não precisa importar `WalletModule` aqui por causa disso
+ * (só o lado "crédito": saldo, pacotes, recarga Pix e webhook, ver
+ * wallet.module.ts).
  */
 @Module({
-  imports: [ConfigModule, JwtModule.register({}), forwardRef(() => SendingModule), PlansModule],
+  imports: [ConfigModule, JwtModule.register({}), forwardRef(() => SendingModule)],
   controllers: [CampaignsController],
   providers: [
     CampaignsService,

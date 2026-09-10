@@ -105,19 +105,6 @@ export const envValidationSchema = Joi.object({
   // SendMessageWorker).
   SEND_MAX_ATTEMPTS: Joi.number().min(1).max(20).default(5),
   SEND_BACKOFF_DELAY_MS: Joi.number().min(0).default(10_000),
-  // Etapa 16 (Planos e uso — README raiz §16). `REVENUECAT_SECRET_API_KEY`
-  // (dashboard RevenueCat → Project Settings → API Keys → "Secret API Key")
-  // autentica `RevenueCatApiService` contra a REST API v1 deles — opcional
-  // aqui (Joi) mas `RevenueCatApiService` falha com causa clara se faltar na
-  // hora de sincronizar um plano (`POST /plans/sync`). `REVENUECAT_WEBHOOK_AUTH_HEADER`
-  // é o valor exigido no header `Authorization` de todo webhook recebido
-  // (configurado do lado da RevenueCat, dashboard → Integrations → Webhooks)
-  // — verificação básica sempre feita; `REVENUECAT_WEBHOOK_HMAC_SECRET` liga
-  // a verificação HMAC opcional e mais forte (`X-RevenueCat-Webhook-Signature`),
-  // ver `RevenueCatWebhookService`.
-  REVENUECAT_SECRET_API_KEY: Joi.string().optional(),
-  REVENUECAT_WEBHOOK_AUTH_HEADER: Joi.string().optional(),
-  REVENUECAT_WEBHOOK_HMAC_SECRET: Joi.string().optional(),
   // Etapa 17 (Observabilidade avançada — README raiz §17). `AppInfoService`
   // usa isto para `AppInfo.version` (lib/data/models/app_info.dart) se
   // definido; senão cai no `version` de package.json (mesmo binário, então
@@ -154,4 +141,21 @@ export const envValidationSchema = Joi.object({
   ALERT_FAILURE_RATE_THRESHOLD: Joi.number().min(0).max(1).default(0.3),
   ALERT_FAILURE_RATE_WINDOW_MINUTES: Joi.number().min(1).default(30),
   ALERT_FAILURE_RATE_MIN_SAMPLES: Joi.number().min(1).default(10),
+  // Carteira de créditos — cobrança Pix via Mercado Pago (substitui o antigo
+  // plano mensal/RevenueCat). Todos opcionais: sem MERCADOPAGO_ACCESS_TOKEN,
+  // `WalletService.createRecharge` falha com `PixPaymentError` (causa clara)
+  // em vez de quebrar a subida do app — suficiente para dev local sem conta
+  // Mercado Pago configurada (o resto da carteira, saldo/débito de campanha,
+  // não depende destas variáveis). Access token e public key vêm do painel
+  // Mercado Pago (Suas integrações > credenciais de produção).
+  MERCADOPAGO_ACCESS_TOKEN: Joi.string().optional(),
+  MERCADOPAGO_PUBLIC_KEY: Joi.string().optional(),
+  // Secret exibido ao configurar a notificação webhook no painel Mercado
+  // Pago (Suas integrações > Webhooks) — usado para validar o header
+  // `x-signature` de cada notificação (ver MercadoPagoApiService.verifySignature).
+  // Ausente: o webhook aceita notificações sem checar assinatura (permissivo
+  // só para dev local sem domínio público para configurar o webhook de
+  // verdade) — setar sempre em produção, senão qualquer request forjado
+  // creditaria saldo sem pagamento real.
+  MERCADOPAGO_WEBHOOK_SECRET: Joi.string().optional(),
 });

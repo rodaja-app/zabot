@@ -7,7 +7,7 @@
  * `utils/e2e-app.ts`). Se estas variáveis fossem setadas só num `beforeAll`,
  * a validação já teria rodado (e provavelmente falhado) antes disso.
  *
- * Valores aqui cobrem só o "fluxo crítico" (auth, campanhas, plans — ver
+ * Valores aqui cobrem só o "fluxo crítico" (auth, campanhas, carteira — ver
  * task #79): não tenta ser um `.env` completo, só o suficiente pra esses tês
  * specs subirem o `AppModule` real contra Postgres/Redis locais
  * (`docker-compose up -d postgres redis`, ver README).
@@ -35,13 +35,6 @@ process.env.SESSION_ENCRYPTION_KEY ??= 'e2'.repeat(32);
 // LOG_LEVEL (fatal/error/warn/info/debug/trace — não há "silent").
 process.env.LOG_LEVEL ??= 'error';
 process.env.SENTRY_DSN = '';
-
-// Segredo HMAC do webhook RevenueCat (plans.e2e-spec.ts assina o corpo com
-// este mesmo valor via RevenueCatWebhookService.verifyHmacSignature).
-process.env.REVENUECAT_WEBHOOK_HMAC_SECRET ??= 'e2e-revenuecat-hmac-secret';
-// Sem REVENUECAT_WEBHOOK_AUTH_HEADER: verificação básica de Authorization
-// fica desligada (comportamento "dev local" documentado em
-// RevenueCatWebhookService.verifyRequest), só a assinatura HMAC é exigida.
 
 // Janela de envio sempre aberta — sem isto, SendMessageProcessor reagendaria
 // (via TimezoneService.isWithinSendingWindow) sempre que o teste rodar fora

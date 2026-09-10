@@ -953,113 +953,191 @@ abstract class AppLocalizations {
   /// **'Sair'**
   String get menu_account_logout_button;
 
-  /// Título do card de plano/assinatura na Tela Menu
+  /// Título do card de carteira na Tela Menu
   ///
   /// In pt, this message translates to:
-  /// **'Plano e assinatura'**
-  String get menu_plan_card_title;
+  /// **'Carteira de créditos'**
+  String get wallet_card_title;
 
-  /// Rótulo de status quando o plano está ativo
+  /// Saldo atual exibido no card de carteira na Tela Menu
   ///
   /// In pt, this message translates to:
-  /// **'Ativo'**
-  String get menu_plan_status_active;
+  /// **'{balance} créditos disponíveis'**
+  String wallet_card_balance_label(int balance);
 
-  /// Rótulo de status quando o plano está em período de teste
+  /// Título da tela de recarga de créditos
   ///
   /// In pt, this message translates to:
-  /// **'Período de teste'**
-  String get menu_plan_status_trial;
+  /// **'Recarregar créditos'**
+  String get wallet_recharge_screen_title;
 
-  /// Rótulo de status quando o plano expirou
+  /// Título da lista de pacotes de recarga
   ///
   /// In pt, this message translates to:
-  /// **'Expirado'**
-  String get menu_plan_status_expired;
+  /// **'Escolha um pacote'**
+  String get wallet_packages_section_title;
 
-  /// Data da próxima renovação do plano
+  /// Quantidade de créditos de um pacote de recarga
   ///
   /// In pt, this message translates to:
-  /// **'Renova em {date}'**
-  String menu_plan_renews_on(String date);
+  /// **'{credits} créditos'**
+  String wallet_package_credits_label(int credits);
 
-  /// Uso de mensagens do plano no mês corrente
+  /// Percentual de bônus de um pacote de recarga
   ///
   /// In pt, this message translates to:
-  /// **'{used} de {limit} mensagens usadas este mês'**
-  String menu_plan_usage_label(int used, int limit);
+  /// **'+{bonusPercent}% de bônus'**
+  String wallet_package_bonus_label(int bonusPercent);
 
-  /// Botão que abre o diálogo de comparação de planos
+  /// Mensagem exibida quando a criação da recarga Pix falha
   ///
   /// In pt, this message translates to:
-  /// **'Comparar planos'**
-  String get menu_plan_compare_button;
+  /// **'Não foi possível gerar a cobrança Pix. Tente novamente.'**
+  String get wallet_create_recharge_error;
 
-  /// Botão que abre o diálogo de troca de plano
+  /// Valor e créditos da cobrança Pix em andamento
   ///
   /// In pt, this message translates to:
-  /// **'Assinar/alterar plano'**
-  String get menu_plan_change_button;
+  /// **'{priceLabel} · {credits} créditos'**
+  String wallet_pix_amount_label(String priceLabel, int credits);
 
-  /// Botão que abre o diálogo de histórico de pagamentos
+  /// Instruções de pagamento exibidas junto ao QR code do Pix
   ///
   /// In pt, this message translates to:
-  /// **'Histórico de pagamentos'**
-  String get menu_plan_payment_history_button;
+  /// **'Escaneie o QR code com o app do seu banco ou copie o código Pix abaixo para concluir o pagamento.'**
+  String get wallet_pix_instructions;
 
-  /// Título do diálogo de comparação de planos
+  /// Botão que copia o código Pix copia-e-cola
   ///
   /// In pt, this message translates to:
-  /// **'Comparar planos'**
-  String get menu_plan_compare_dialog_title;
+  /// **'Copiar código Pix'**
+  String get wallet_pix_copy_button;
 
-  /// Título do diálogo de escolha de novo plano
+  /// Confirmação exibida após copiar o código Pix
   ///
   /// In pt, this message translates to:
-  /// **'Assinar/alterar plano'**
-  String get menu_plan_change_dialog_title;
+  /// **'Código Pix copiado!'**
+  String get wallet_pix_copied_message;
 
-  /// Título do diálogo de histórico de pagamentos
+  /// Mensagem exibida enquanto aguarda a confirmação do Pix
   ///
   /// In pt, this message translates to:
-  /// **'Histórico de pagamentos'**
-  String get menu_plan_payment_history_dialog_title;
+  /// **'Aguardando confirmação do pagamento...'**
+  String get wallet_pix_waiting_label;
 
-  /// Mensagem quando não há pagamentos no histórico
+  /// Título da tela de sucesso após a confirmação da recarga
   ///
   /// In pt, this message translates to:
-  /// **'Nenhum pagamento registrado ainda.'**
-  String get menu_plan_payment_history_empty;
+  /// **'Pagamento confirmado!'**
+  String get wallet_success_title;
 
-  /// Rótulo de status de um pagamento concluído
+  /// Mensagem de sucesso após a confirmação da recarga
   ///
   /// In pt, this message translates to:
-  /// **'Pago'**
-  String get menu_plan_payment_status_paid;
+  /// **'{credits} créditos adicionados à sua carteira.'**
+  String wallet_success_message(int credits);
 
-  /// Rótulo de status de um pagamento pendente
+  /// Botão que fecha a tela de recarga após o sucesso
   ///
   /// In pt, this message translates to:
-  /// **'Pendente'**
-  String get menu_plan_payment_status_pending;
+  /// **'Concluir'**
+  String get wallet_success_button;
 
-  /// Rótulo de status de um pagamento recusado
+  /// Título da etapa de escolha do método de pagamento (Pix ou cartão)
   ///
   /// In pt, this message translates to:
-  /// **'Recusado'**
-  String get menu_plan_payment_status_failed;
+  /// **'Como você quer pagar?'**
+  String get wallet_method_choice_title;
 
-  /// Descrição de um plano no diálogo Comparar planos, a partir do limite de mensagens
+  /// Rótulo da opção de pagamento via Pix
   ///
   /// In pt, this message translates to:
-  /// **'Até {limit} mensagens por mês.'**
-  String menu_plan_description(int limit);
+  /// **'Pix'**
+  String get wallet_method_pix_label;
 
-  /// Mensagem exibida quando a compra nativa do plano falha (exceto cancelamento pelo usuário)
+  /// Descrição da opção de pagamento via Pix
   ///
   /// In pt, this message translates to:
-  /// **'Não foi possível concluir a compra. Tente novamente.'**
-  String get menu_plan_purchase_error;
+  /// **'Pagamento instantâneo via QR code'**
+  String get wallet_method_pix_description;
+
+  /// Rótulo da opção de pagamento via cartão de crédito
+  ///
+  /// In pt, this message translates to:
+  /// **'Cartão de crédito'**
+  String get wallet_method_card_label;
+
+  /// Descrição da opção de pagamento via cartão de crédito
+  ///
+  /// In pt, this message translates to:
+  /// **'Pagamento à vista, aprovação na hora'**
+  String get wallet_method_card_description;
+
+  /// Título do formulário de dados do cartão
+  ///
+  /// In pt, this message translates to:
+  /// **'Dados do cartão'**
+  String get wallet_card_form_title;
+
+  /// Rótulo do campo de número do cartão
+  ///
+  /// In pt, this message translates to:
+  /// **'Número do cartão'**
+  String get wallet_card_number_label;
+
+  /// Rótulo do campo de nome do titular do cartão
+  ///
+  /// In pt, this message translates to:
+  /// **'Nome impresso no cartão'**
+  String get wallet_card_holder_name_label;
+
+  /// Rótulo do campo de mês de validade do cartão
+  ///
+  /// In pt, this message translates to:
+  /// **'Mês (MM)'**
+  String get wallet_card_expiry_month_label;
+
+  /// Rótulo do campo de ano de validade do cartão
+  ///
+  /// In pt, this message translates to:
+  /// **'Ano (AA)'**
+  String get wallet_card_expiry_year_label;
+
+  /// Rótulo do campo de código de segurança do cartão
+  ///
+  /// In pt, this message translates to:
+  /// **'CVV'**
+  String get wallet_card_cvv_label;
+
+  /// Rótulo do campo de CPF do titular do cartão
+  ///
+  /// In pt, this message translates to:
+  /// **'CPF do titular'**
+  String get wallet_card_cpf_label;
+
+  /// Botão que confirma o pagamento com cartão
+  ///
+  /// In pt, this message translates to:
+  /// **'Pagar'**
+  String get wallet_card_submit_button;
+
+  /// Mensagem exibida enquanto o pagamento com cartão está sendo processado
+  ///
+  /// In pt, this message translates to:
+  /// **'Processando pagamento...'**
+  String get wallet_card_processing_label;
+
+  /// Erro exibido quando o formulário de cartão tem campos inválidos ou incompletos
+  ///
+  /// In pt, this message translates to:
+  /// **'Preencha todos os campos corretamente antes de continuar.'**
+  String get wallet_card_form_invalid_error;
+
+  /// Erro genérico exibido quando o pagamento com cartão falha por motivo não específico (rede, tokenização etc.)
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível concluir o pagamento com cartão. Tente novamente ou use Pix.'**
+  String get wallet_card_generic_error;
 
   /// Título do card de configurações na Tela Menu
   ///

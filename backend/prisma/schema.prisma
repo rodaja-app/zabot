@@ -34,8 +34,7 @@ model User {
   session           Session?
   contacts          Contact[]
   campaigns         Campaign[]
-  subscription      Subscription?
-  paymentHistory    PaymentHistoryEntry[]
+  wallet            Wallet?
   settings          UserSettings?
 
   @@map("users")
@@ -531,205 +530,101 @@ model Envio {
   @@map("envios")
 }
 
-/// Espelha os 3 estados que `SubscriptionPlan.status`/`AppStatus` (front,
-/// lib/data/models/subscription_plan.dart + lib/widgets/status_badge.dart)
-/// precisam distinguir no card de plano: ATIVA → `AppStatus.connected`,
-/// TRIAL → `AppStatus.pending`, EXPIRADA → `AppStatus.failed`. Não existe um
-/// 4º estado "sem plano": usuário sem `Subscription` (ou cuja única linha
-/// está EXPIRADA) é tratado como EXPIRADA tanto para exibição quanto para
-/// bloqueio de envio — ver comentário do model `Subscription` abaixo.
-enum SubscriptionStatus {
-  ATIVA
-  TRIAL
-  EXPIRADA
+/// Tipo de uma linha do extrato da carteira: RECARGA = crédito comprado via
+/// Pix (Mercado Pago); CONSUMO = débito automático na criação de uma
+/// campanha (ver comentário de `WalletTransaction` abaixo e
+/// `CampaignsService.createCampaign`).
+enum WalletTransactionType {
+  RECARGA
+  CONSUMO
 }
 
-/// Status de uma linha do histórico de pagamentos — espelha o reaproveitamento
-/// de `AppStatus` que `PaymentHistoryEntry` (front) já faz (`sent`/`pending`/`failed`
-/// como "paga"/"pendente"/"falhou"), só que com nomes próprios (não é o mesmo
-/// domínio de `EnvioStatus`: aqui é sucesso de cobrança, não de entrega de
-/// mensagem).
-enum PaymentStatus {
-  PAGO
+/// Status de uma linha de RECARGA (cobrança Pix) — espelha o ciclo de vida
+/// de um pagamento Pix no Mercado Pago: PENDENTE enquanto o QR code ainda
+/// não foi pago, PAGO quando o webhook confirma o pagamento (é só então que
+/// `Wallet.balance` é creditado — nunca no momento da criação da cobrança),
+/// FALHOU se expirar/for cancelado. Linhas de CONSUMO nascem sempre PAGO
+/// (débito imediato, síncrono, dentro da própria transação de criação da
+/// campanha — não existe "consumo pendente").
+enum WalletTransactionStatus {
   PENDENTE
+  PAGO
   FALHOU
 }
 
-/// Etapa 16 (Planos e uso — README raiz §13, backend/README.md "Etapa 16"
-/// para o porquê da arquitetura RevenueCat). Catálogo ESTÁTICO de planos —
-/// não pertence a nenhum usuário. Não usa RLS pelo motivo oposto ao de
-/// `User` (que é isento porque precede o tenant): aqui é porque o dado é
-/// compartilhado por TODOS os tenants, nunca escrito por request de usuário
-/// (populado por seed — ver backend/README.md "Rodando localmente").
+/// Substitui o antigo par Plan/Subscription (assinatura mensal via
+/// RevenueCat) por um saldo pré-pago em créditos de mensagem — decisão do
+/// usuário: sem plano mensal, sem loja (App Store/Play) no meio, cobrança
+/// direta via Pix/Mercado Pago. 1 crédito = 1 `Envio` enfileirado (mesma
+/// unidade de contagem que `Campaign.recipientCount`/`sentCount`, só que em
+/// nível de usuário e nunca resetada por período — créditos não expiram).
 ///
-/// `key` casa 1:1 com `PlanOption.id` do front
-/// (lib/data/models/plan_option.dart: 'basico'/'pro'/'premium') — é o
-/// identificador estável usado nas rotas públicas desta API, nunca o uuid
-/// interno. `revenueCatProductId` é o `product_id` configurado no dashboard
-/// da RevenueCat para este plano (RevenueCat unifica o produto Apple/Google
-/// sob um único identificador de produto no seu catálogo) — é o campo que
-/// `RevenueCatWebhookService`/`PlansService.syncFromRevenueCat` usam para
-/// mapear um evento/CustomerInfo de volta para uma linha desta tabela.
-model Plan {
-  id   String @id @default(uuid())
-  key  String @unique
-  name String
-
-  /// Rótulo pronto pra exibir (ex.: "R$ 99,90/mês"). Quem define o preço de
-  /// verdade é a loja (App Store Connect / Play Console) — este campo é só
-  /// para a UI não ficar em branco antes do primeiro sync, nunca usado para
-  /// cobrança real.
-  priceLabel    String
-  messagesLimit Int
-
-  revenueCatProductId String @unique
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  subscriptions  Subscription[]
-  paymentHistory PaymentHistoryEntry[]
-
-  @@map("plans")
-}
-
-/// Etapa 16 — espelha, por usuário, o estado de assinatura que a RevenueCat
-/// controla de verdade (compra nativa via StoreKit/Play Billing — decisão
-/// "RevenueCat" tomada porque ZaBot é distribuído via App Store/Play Store,
-/// e as duas exigem que compras que desbloqueiam funcionalidade do app usem
-/// o sistema de compra nativo da própria loja: ver backend/README.md
-/// "Etapa 16"). Este backend NUNCA processa pagamento nem inicia/cancela
-/// assinatura — só reflete o que a RevenueCat manda via webhook
-/// (`RevenueCatWebhookService`) ou via sync sob demanda
-/// (`PlansService.syncFromRevenueCat`, chamado pelo app logo após uma compra
-/// bem-sucedida, para não depender só da entrega do webhook — RevenueCat
-/// entrega a maioria dos webhooks em 5-60s, mas não é instantâneo).
-///
-/// RLS de verdade, como as demais tabelas de tenant — mas escrito a partir
-/// do webhook (sem JWT/request de usuário) via
-/// `PrismaService.withTenantContext(appUserId, ...)`, usando o `app_user_id`
-/// do payload (que é sempre o `User.id` deste backend — convenção de
-/// integração: o app chama `Purchases.logIn(userId)` da RevenueCat logo após
-/// o login/cadastro próprio) como tenant, já que o payload só chega depois
-/// de passar pela verificação de autenticidade do webhook (header/HMAC) —
-/// mesmo padrão de `SendMessageProcessorService`, que também deriva o
-/// tenant de um campo confiável (`job.data.userId`) em vez de um JWT ao
-/// vivo (etapa 15).
-///
-/// `planId` nulo = nenhuma compra reconhecida ainda para este usuário (conta
-/// nova, ou assinatura expirada sem plano equivalente identificado). Junto
-/// com `status = EXPIRADA` como default, um usuário sem nenhuma linha aqui é
-/// bloqueado por `PlansService.assertWithinUsageLimit` sem precisar de um
-/// caso especial — mesma filosofia de "nunca inventar acesso sem dado que
-/// confirme" já usada em `ContactStatus`/`EnvioStatus`.
-///
-/// `messagesUsed` é reiniciado a cada novo período de cobrança (evento
-/// RENEWAL — ver `RevenueCatWebhookService`). Contabiliza `Envio`s
-/// ENFILEIRADOS na criação da campanha (`CampaignsService.createCampaign`),
-/// não só os que tiveram sucesso de entrega — mesmo padrão de
-/// `Campaign.recipientCount` (contado na criação, nunca recalculado depois):
-/// evita condição de corrida entre checar o limite e persistir os `Envio`s,
-/// já que as duas coisas acontecem na mesma transação.
-model Subscription {
+/// RLS de verdade, como as demais tabelas de tenant (`Contact`, `Campaign`
+/// etc.) — todo acesso via `PrismaService.withTenantContext(userId, ...)`.
+/// `balance` nunca é negativo: `CampaignsService.createCampaign` só debita
+/// dentro da mesma transação que cria os `Envio`s, e só depois de confirmar
+/// `balance >= quantidade` ("tudo ou nada" — nenhum envio parcial é
+/// enfileirado se o saldo não cobrir a campanha inteira).
+model Wallet {
   id     String @id @default(uuid())
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  planId String?
-  plan   Plan?   @relation(fields: [planId], references: [id])
-
-  status SubscriptionStatus @default(EXPIRADA)
-  /// false quando a RevenueCat reportou `CANCELLATION` mas o acesso ainda é
-  /// válido até `currentPeriodEnd` — cancelamento não revoga acesso
-  /// imediatamente pela loja, só desliga a renovação automática.
-  autoRenew Boolean @default(true)
-
-  currentPeriodStart DateTime?
-  currentPeriodEnd   DateTime?
-
-  messagesUsed Int @default(0)
-
-  store                   String?
-  environment             String?
-  revenueCatEntitlementId String?
-  originalTransactionId   String?
-
-  lastEventType String?
-  lastEventAt   DateTime?
+  balance Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("subscriptions")
+  transactions WalletTransaction[]
+
+  @@map("wallets")
 }
 
-/// Item do "Histórico de pagamentos" do front (Menu 3 —
-/// lib/data/models/payment_history_entry.dart). Uma linha por evento
-/// financeiramente relevante recebido da RevenueCat (ver
-/// `RevenueCatWebhookService.PAYMENT_HISTORY_EVENT_TYPES`) — eventos de
-/// ciclo de vida sem impacto de cobrança (ex. `EXPIRATION`) atualizam
-/// `Subscription` mas não geram linha aqui.
+/// Extrato da carteira — 1 linha por movimentação (RECARGA ou CONSUMO), nunca
+/// sobrescrita (auditoria completa de saldo, mesmo espírito do
+/// `verificationLog` de `Contact`: reconstruir o saldo atual a partir do
+/// histórico sempre bate com `Wallet.balance`).
 ///
-/// `amountCents`/`currency` vêm direto de `price`/`currency` do payload do
-/// webhook e podem ser `null` quando a RevenueCat não os inclui (campo
-/// "Sometimes" no contrato) — quem exibe trata isso como rótulo genérico, em
-/// vez de inventar um valor. `revenueCatEventId` é o `id` do evento que
-/// originou a linha (único — RevenueCat pode reentregar o mesmo evento mais
-/// de uma vez, ver `RevenueCatWebhookService`).
+/// Campos de RECARGA (cobrança Pix/Mercado Pago): `amountCents` é o valor
+/// pago em centavos (mínimo R$ 20 — validado na camada de serviço, não aqui);
+/// `pixPaymentId` é o `id` do pagamento no Mercado Pago (chave natural para
+/// idempotência do webhook — mesmo padrão que `RevenueCatEvent.id` cumpria
+/// antes); `pixQrCode`/`pixQrCodeBase64` guardam o payload copia-e-cola/QR
+/// enquanto `status = PENDENTE`, só para reexibir a cobrança em aberto sem
+/// nova chamada à API do Mercado Pago.
 ///
-/// Mesma exceção de RLS-por-tenant-derivado-do-payload de `Subscription`
-/// (ver comentário acima) — escrito via `withTenantContext(appUserId, ...)`.
-model PaymentHistoryEntry {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+/// Campos de CONSUMO: `campaignId` referencia a campanha que gerou o débito
+/// (sem relação FK formal — `Campaign` pode ser apagada por
+/// `CampaignsService.clearHistory` e o extrato financeiro deve sobreviver a
+/// isso, mesma razão de `campaignId` opcional em `CampaignMedia`).
+///
+/// `credits` é sempre positivo; o sinal da movimentação é dado por `type`
+/// (RECARGA soma, CONSUMO subtrai) — quem lê o extrato aplica o sinal, nunca
+/// gravado aqui para não duplicar a fonte da verdade.
+model WalletTransaction {
+  id       String @id @default(uuid())
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId   String
 
-  planId String?
-  plan   Plan?   @relation(fields: [planId], references: [id])
+  type   WalletTransactionType
+  status WalletTransactionStatus @default(PAGO)
 
-  /// Tipo do evento RevenueCat que originou esta linha (ex.: "INITIAL_PURCHASE",
-  /// "RENEWAL", "CANCELLATION") — guardado como veio, nunca traduzido para um
-  /// enum fechado: novos tipos futuros da RevenueCat continuam sendo
-  /// registrados sem exigir migração de schema.
-  eventType String
-  status    PaymentStatus @default(PAGO)
+  credits Int
 
-  amountCents Int?
-  currency    String?
+  amountCents  Int?
+  pixPaymentId String? @unique
+  pixQrCode    String?
+  pixQrCodeBase64 String?
+  paidAt       DateTime?
 
-  occurredAt        DateTime
-  revenueCatEventId String   @unique
+  campaignId String?
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
-  @@map("payment_history_entries")
-}
-
-/// Guarda de idempotência + trilha de auditoria bruta dos webhooks da
-/// RevenueCat (Etapa 16) — mesmo espírito operacional de
-/// `DeadLetterQueueService` na etapa 15 ("Postgres é fonte da verdade"), só
-/// que aqui a própria tabela É a fonte da verdade (não há fila por trás).
-///
-/// NÃO usa RLS: não é dado de negócio por tenant que algum endpoint
-/// autenticado devolve — é um registro técnico interno, verificado e escrito
-/// pelo próprio `RevenueCatWebhookService` antes mesmo de se saber com
-/// segurança a qual usuário o evento pertence (`appUserId` pode ser nulo em
-/// eventos sem identidade de assinante — ex. `EXPERIMENT_ENROLLMENT`).
-/// `id` é o `event.id` da RevenueCat (chave natural, nunca gerado aqui):
-/// tentar inserir o mesmo id duas vezes falha por violação de unicidade —
-/// é exatamente esse erro que `RevenueCatWebhookService.handle` usa para
-/// detectar reentrega e responder 200 sem reprocessar (RevenueCat retenta
-/// até 5 vezes se não receber 200 — ver docs).
-model RevenueCatEvent {
-  id         String   @id
-  type       String
-  appUserId  String?
-  payload    Json
-  receivedAt DateTime @default(now())
-
-  @@index([appUserId])
-  @@map("revenuecat_events")
+  @@map("wallet_transactions")
 }
 
 /// Etapa 17 (Observabilidade avançada — README raiz linha 241, "configurações

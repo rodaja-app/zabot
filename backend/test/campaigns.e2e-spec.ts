@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { buildE2eApp, ensurePlansSeeded } from './utils/e2e-app';
+import { buildE2eApp, creditWalletForTests } from './utils/e2e-app';
 import { FakeWhatsAppProvider } from './utils/fake-whatsapp.provider';
 import { TestEmailProvider } from './utils/test-email.provider';
 
@@ -12,11 +12,11 @@ import { TestEmailProvider } from './utils/test-email.provider';
  * (via `FakeWhatsAppProvider`) → status ENVIADA. Sessions/Contacts não são
  * suites separadas por decisão do usuário — só passos de setup aqui.
  *
- * Requer uma `Subscription` ativa (`assertWithinUsageLimit`,
- * `plans.service.ts`) — sem ela `POST /campaigns` sempre falharia com
- * `UsageLimitExceededError` antes mesmo de chegar no envio, então o teste
- * semeia uma diretamente via `prisma.withTenantContext` (mesmo padrão de
- * escrita usado pelo `PlansService`/webhook — RLS exige tenant context).
+ * Requer saldo na carteira (`CampaignsService.debitWalletOrThrow`) — sem
+ * crédito, `POST /campaigns` sempre falharia com `InsufficientBalanceError`
+ * antes mesmo de chegar no envio, então o teste credita a carteira
+ * diretamente via `creditWalletForTests` (mesmo padrão de escrita usado em
+ * produção — RLS exige tenant context).
  */
 describe('Campaigns (e2e)', () => {
   let app: INestApplication;
@@ -52,7 +52,6 @@ describe('Campaigns (e2e)', () => {
     prisma = ctx.prisma;
     email = ctx.email;
     whatsapp = ctx.whatsapp;
-    await ensurePlansSeeded(prisma);
   });
 
   afterAll(async () => {
@@ -60,8 +59,8 @@ describe('Campaigns (e2e)', () => {
     await app.close();
   });
 
-  /** Registra+confirma um usuário e semeia uma Subscription ATIVA no plano `pro` (5000 msgs) — sem isso `createCampaign` rejeita por `UsageLimitExceededError`. */
-  const registerConfirmedUserWithActiveSubscription = async (label: string): Promise<{ userId: string; accessToken: string; userEmail: string }> => {
+  /** Registra+confirma um usuário e credita a carteira (100 créditos, de sobra p/ os testes) — sem saldo, `createCampaign` rejeita por `InsufficientBalanceError`. */
+  const registerConfirmedUserWithCredits = async (label: string, credits = 100): Promise<{ userId: string; accessToken: string; userEmail: string }> => {
     const server = app.getHttpServer();
     const userEmail = uniqueEmail(label);
 
@@ -76,27 +75,14 @@ describe('Campaigns (e2e)', () => {
     const user = await prisma.user.findUnique({ where: { email: userEmail } });
     if (!user) throw new Error(`Usuário ${userEmail} não encontrado após confirmação.`);
 
-    const plan = await prisma.plan.findUnique({ where: { key: 'pro' } });
-    if (!plan) throw new Error('Plano "pro" não encontrado — ensurePlansSeeded não rodou?');
-
-    await prisma.withTenantContext(user.id, (tx) =>
-      tx.subscription.create({
-        data: {
-          userId: user.id,
-          planId: plan.id,
-          status: 'ATIVA',
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        },
-      }),
-    );
+    await creditWalletForTests(prisma, user.id, credits);
 
     return { userId: user.id, accessToken, userEmail };
   };
 
   it('cobre o fluxo completo: sessão conectada → importar/validar contatos → criar campanha → worker envia → ENVIADA', async () => {
     const server = app.getHttpServer();
-    const { accessToken } = await registerConfirmedUserWithActiveSubscription('campaign-flow');
+    const { accessToken } = await registerConfirmedUserWithCredits('campaign-flow');
     const authHeader = `Bearer ${accessToken}`;
 
     // 1. Conectar sessão (fire-and-forget, 202) — FakeWhatsAppProvider emite CONECTADA via setImmediate.
@@ -153,17 +139,17 @@ describe('Campaigns (e2e)', () => {
     expect(sent?.params.text).toBe('Olá João, tudo bem?');
   });
 
-  it('bloqueia criação de campanha sem plano ativo (limite de uso, sem Subscription)', async () => {
+  it('bloqueia criação de campanha sem saldo (carteira sem crédito, "tudo ou nada")', async () => {
     const server = app.getHttpServer();
-    const userEmail = uniqueEmail('no-sub');
+    const userEmail = uniqueEmail('no-balance');
 
-    await request(server).post('/auth/register').send({ name: 'Sem Plano', email: userEmail, password: 'senha-forte-123' }).expect(201);
+    await request(server).post('/auth/register').send({ name: 'Sem Saldo', email: userEmail, password: 'senha-forte-123' }).expect(201);
     const code = email.lastVerificationCodeFor(userEmail);
     const confirmRes = await request(server).post('/auth/confirm-code').send({ email: userEmail, code }).expect(200);
     const authHeader = `Bearer ${confirmRes.body.accessToken}`;
 
-    // Sem Subscription semeada — createCampaign deve rejeitar antes de qualquer envio.
-    // UsageLimitExceededError → ErrorCategory.PAGAMENTO → 402 (error-categorizer.ts).
+    // Sem Wallet criada (nunca recarregou) — createCampaign deve rejeitar antes de qualquer envio.
+    // InsufficientBalanceError → ErrorCategory.PAGAMENTO → 402 (error-categorizer.ts).
     await request(server)
       .post('/campaigns')
       .set('Authorization', authHeader)

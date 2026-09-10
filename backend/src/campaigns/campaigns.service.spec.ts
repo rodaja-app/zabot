@@ -8,8 +8,9 @@ import { CampaignsService } from './campaigns.service';
  * (README raiz §13), a adoção de mídia (rejeita id inexistente/já usado e
  * tipos mistos), o caso-limite `recipientCount === 0` → campanha já nasce
  * ENVIADA (mesma lógica do mock, que não tem estado "pendente sem ninguém
- * para enviar"), e a etapa 16 (enforcement de limite de uso via
- * `PlansService.assertWithinUsageLimit`, chamado DENTRO da mesma transação,
+ * para enviar"), e o débito "tudo ou nada" da carteira de créditos via
+ * `debitWalletOrThrow` (privado, exercitado indiretamente através de
+ * `tx.wallet`/`tx.walletTransaction`), chamado DENTRO da mesma transação,
  * antes de `Envio.createMany` — ver comentário em `campaigns.service.ts`).
  */
 describe('CampaignsService', () => {
@@ -42,6 +43,13 @@ describe('CampaignsService', () => {
       findMany: jest.fn(async () => [] as { id: string }[]),
     };
     const txEnvio = { createMany: jest.fn(async () => ({ count: 0 })) };
+    // Saldo "de sobra" por padrão (999) para não quebrar os testes que não são
+    // sobre carteira — cada teste de enforcement sobrescreve conforme precisa.
+    const txWallet = {
+      findUnique: jest.fn(async () => ({ id: 'wallet-1', userId: 'user-1', balance: 999 })),
+      updateMany: jest.fn(async () => ({ count: 1 })),
+    };
+    const txWalletTransaction = { create: jest.fn(async () => ({ id: 'wtx-1' })) };
 
     const tx = {
       contact: txContact,
@@ -50,14 +58,15 @@ describe('CampaignsService', () => {
       campaignMedia: txCampaignMedia,
       campaignRecipient: txCampaignRecipient,
       envio: txEnvio,
+      wallet: txWallet,
+      walletTransaction: txWalletTransaction,
     };
 
     const prisma = { withTenantContext: jest.fn((_userId: string, fn: (tx: unknown) => unknown) => fn(tx)) };
     const sendQueue = { enqueueCampaign: jest.fn(async () => 'session-1') };
     const sendWorker = { ensureWorker: jest.fn() };
-    const plansService = { assertWithinUsageLimit: jest.fn(async () => undefined) };
 
-    const service = new CampaignsService(prisma as never, sendQueue as never, sendWorker as never, plansService as never);
+    const service = new CampaignsService(prisma as never, sendQueue as never, sendWorker as never);
     return {
       service,
       prisma,
@@ -68,9 +77,10 @@ describe('CampaignsService', () => {
       txCampaignMedia,
       txCampaignRecipient,
       txEnvio,
+      txWallet,
+      txWalletTransaction,
       sendQueue,
       sendWorker,
-      plansService,
     };
   }
 
@@ -213,41 +223,61 @@ describe('CampaignsService', () => {
     });
   });
 
-  describe('createCampaign — enforcement de limite de uso (etapa 16)', () => {
-    it('chama assertWithinUsageLimit dentro da transação, com quantity = destinatários × mensagens, antes de Envio.createMany', async () => {
-      const { service, txContact, txCampaignMessage, txCampaignRecipient, plansService, txEnvio } = buildService();
+  describe('createCampaign — enforcement de carteira ("tudo ou nada")', () => {
+    it('debita o saldo dentro da transação, com quantity = destinatários × mensagens, antes de Envio.createMany', async () => {
+      const { service, txContact, txCampaignMessage, txCampaignRecipient, txWallet, txWalletTransaction, txEnvio } = buildService();
       txContact.findMany.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }]);
       txCampaignMessage.findMany.mockResolvedValue([{ id: 'm1' }, { id: 'm2' }]);
       txCampaignRecipient.findMany.mockResolvedValue([{ id: 'r1' }, { id: 'r2' }]);
+      txWallet.findUnique.mockResolvedValue({ id: 'wallet-1', userId: 'user-1', balance: 100 });
 
       await service.createCampaign('user-1', { messages: ['Oi', 'Tudo bem?'] });
 
-      expect(plansService.assertWithinUsageLimit).toHaveBeenCalledWith(expect.anything(), 'user-1', 4);
-      const assertOrder = plansService.assertWithinUsageLimit.mock.invocationCallOrder[0];
+      expect(txWallet.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', balance: 100 },
+        data: { balance: { decrement: 4 } },
+      });
+      expect(txWalletTransaction.create).toHaveBeenCalledWith({
+        data: { walletId: 'wallet-1', userId: 'user-1', type: 'CONSUMO', credits: 4, campaignId: 'campaign-1' },
+      });
+      const debitOrder = txWallet.updateMany.mock.invocationCallOrder[0];
       const createManyOrder = txEnvio.createMany.mock.invocationCallOrder[0];
-      expect(assertOrder).toBeLessThan(createManyOrder);
+      expect(debitOrder).toBeLessThan(createManyOrder);
     });
 
-    it('quando assertWithinUsageLimit rejeita, a criação inteira falha e nenhum Envio é persistido', async () => {
-      const { service, txContact, txCampaignMessage, txCampaignRecipient, plansService, txEnvio, sendQueue } = buildService();
+    it('sem Wallet (nunca recarregou), rejeita com InsufficientBalanceError e nenhum Envio é persistido', async () => {
+      const { service, txContact, txCampaignMessage, txCampaignRecipient, txWallet, txEnvio, sendQueue } = buildService();
       txContact.findMany.mockResolvedValue([{ id: 'c1' }]);
       txCampaignMessage.findMany.mockResolvedValue([{ id: 'm1' }]);
       txCampaignRecipient.findMany.mockResolvedValue([{ id: 'r1' }]);
-      plansService.assertWithinUsageLimit.mockRejectedValue(new Error('limite atingido'));
+      txWallet.findUnique.mockResolvedValue(null);
 
-      await expect(service.createCampaign('user-1', { messages: ['Oi'] })).rejects.toThrow('limite atingido');
+      await expect(service.createCampaign('user-1', { messages: ['Oi'] })).rejects.toThrow('Saldo insuficiente');
 
       expect(txEnvio.createMany).not.toHaveBeenCalled();
       expect(sendQueue.enqueueCampaign).not.toHaveBeenCalled();
     });
 
-    it('recipientCount === 0 não chama assertWithinUsageLimit (nada a enfileirar)', async () => {
-      const { service, txContact, plansService } = buildService();
+    it('com Wallet mas saldo menor que a quantidade necessária, rejeita e nenhum Envio é persistido', async () => {
+      const { service, txContact, txCampaignMessage, txCampaignRecipient, txWallet, txEnvio, sendQueue } = buildService();
+      txContact.findMany.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }]);
+      txCampaignMessage.findMany.mockResolvedValue([{ id: 'm1' }]);
+      txCampaignRecipient.findMany.mockResolvedValue([{ id: 'r1' }, { id: 'r2' }]);
+      txWallet.findUnique.mockResolvedValue({ id: 'wallet-1', userId: 'user-1', balance: 1 });
+
+      await expect(service.createCampaign('user-1', { messages: ['Oi'] })).rejects.toThrow('Saldo insuficiente');
+
+      expect(txEnvio.createMany).not.toHaveBeenCalled();
+      expect(sendQueue.enqueueCampaign).not.toHaveBeenCalled();
+    });
+
+    it('recipientCount === 0 não consulta a carteira (nada a enfileirar)', async () => {
+      const { service, txContact, txWallet } = buildService();
       txContact.findMany.mockResolvedValue([]);
 
       await service.createCampaign('user-1', { messages: ['Oi'] });
 
-      expect(plansService.assertWithinUsageLimit).not.toHaveBeenCalled();
+      expect(txWallet.findUnique).not.toHaveBeenCalled();
     });
   });
 

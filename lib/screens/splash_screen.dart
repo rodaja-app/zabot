@@ -8,6 +8,7 @@ import '../data/connection_repository.dart';
 import '../data/contact_repository.dart';
 import '../data/menu_repository.dart';
 import '../data/message_repository.dart';
+import '../data/wallet_repository.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'root_shell_screen.dart';
@@ -27,6 +28,7 @@ class SplashScreen extends StatefulWidget {
     required this.messageRepository,
     required this.contactRepository,
     required this.menuRepository,
+    required this.walletRepository,
   });
 
   final AuthRepository authRepository;
@@ -34,6 +36,7 @@ class SplashScreen extends StatefulWidget {
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
   final MenuRepository menuRepository;
+  final WalletRepository walletRepository;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -57,6 +60,7 @@ class _SplashScreenState extends State<SplashScreen> {
           messageRepository: widget.messageRepository,
           contactRepository: widget.contactRepository,
           menuRepository: widget.menuRepository,
+          walletRepository: widget.walletRepository,
         ),
         transitionsBuilder: (_, animation, __, child) =>
             FadeTransition(opacity: animation, child: child),

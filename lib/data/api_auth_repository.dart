@@ -1,8 +1,5 @@
-import 'package:purchases_flutter/purchases_flutter.dart';
-
 import 'api/api_client.dart';
 import 'api/api_exception.dart';
-import 'api/jwt_utils.dart';
 import 'auth_repository.dart';
 
 /// Implementação real de [AuthRepository] (Etapa 18 — integração final),
@@ -51,7 +48,6 @@ class ApiAuthRepository implements AuthRepository {
         accessToken: accessToken,
         refreshToken: body['refreshToken'] as String,
       );
-      await _identifyRevenueCat(accessToken);
       return true;
     } on ApiException catch (e) {
       // 401 é a resposta do backend para código errado/expirado/tentativas
@@ -76,7 +72,6 @@ class ApiAuthRepository implements AuthRepository {
         accessToken: accessToken,
         refreshToken: body['refreshToken'] as String,
       );
-      await _identifyRevenueCat(accessToken);
       return true;
     } on ApiException catch (e) {
       // 401 cobre email inexistente, senha errada e conta ainda não
@@ -103,7 +98,6 @@ class ApiAuthRepository implements AuthRepository {
       // decidiu fazer.
     }
     await _apiClient.tokenStore.clear();
-    await _forgetRevenueCat();
   }
 
   @override
@@ -114,38 +108,5 @@ class ApiAuthRepository implements AuthRepository {
     // acharia que excluiu a conta e ela continuaria existindo no servidor).
     await _apiClient.delete('/auth/account');
     await _apiClient.tokenStore.clear();
-    await _forgetRevenueCat();
-  }
-
-  /// Identifica o SDK do RevenueCat com o MESMO id interno (`sub` do JWT)
-  /// que o backend usa pra buscar o assinante (`RevenueCatApiService
-  /// .getSubscriber`, ver doc de `ApiMenuRepository`) — sem isso, uma compra
-  /// feita logo após login/confirmação ficaria anônima pro RevenueCat e
-  /// nunca seria encontrada pelo backend. Best-effort: um token sem `sub`
-  /// decodificável (não deveria acontecer, o backend sempre assina com
-  /// `sub`) não pode travar o login por causa de um SDK de pagamento.
-  Future<void> _identifyRevenueCat(String accessToken) async {
-    final userId = subjectFromJwt(accessToken);
-    if (userId == null) return;
-    try {
-      await Purchases.logIn(userId);
-    } on Exception {
-      // Falha aqui não impede o login (rede indisponível, SDK não
-      // configurado etc.) — a compra ainda funcionaria depois, na tela de
-      // Menu, contanto que o SDK já esteja configurado a essa altura
-      // (`main.dart` também tenta identificar no boot quando já há sessão).
-    }
-  }
-
-  /// Best-effort: gera um novo id anônimo no RevenueCat pro próximo usuário
-  /// que fizer login neste aparelho não herdar a identidade do anterior.
-  Future<void> _forgetRevenueCat() async {
-    try {
-      await Purchases.logOut();
-    } on Exception {
-      // Sem sessão ativa no RevenueCat (ex.: usuário nunca abriu a tela de
-      // Menu) é um erro esperado do SDK, não um problema — logout local já
-      // aconteceu de qualquer forma.
-    }
   }
 }

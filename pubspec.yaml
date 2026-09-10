@@ -1,7 +1,7 @@
 name: zabot
 description: "ZaBot — app de disparo em massa via WhatsApp com sessões, contatos inteligentes e campanhas."
 publish_to: "none"
-version: 0.1.0+6
+version: 0.2.0+7
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -21,7 +21,6 @@ dependencies:
   http_parser: ^4.0.2
   socket_io_client: ^3.1.6
   flutter_secure_storage: ^10.3.1
-  purchases_flutter: ^10.11.0
   # Seleção real de arquivo de mídia de campanha (Menu 2, seção "Mídia") —
   # antes da Etapa 18 a tela só marcava um tipo/contagem visual, sem
   # capturar bytes de verdade (ver `nova_campanha_screen.dart`).

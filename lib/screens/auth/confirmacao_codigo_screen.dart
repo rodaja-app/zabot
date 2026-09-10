@@ -6,6 +6,7 @@ import '../../data/connection_repository.dart';
 import '../../data/contact_repository.dart';
 import '../../data/menu_repository.dart';
 import '../../data/message_repository.dart';
+import '../../data/wallet_repository.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_page_route.dart';
@@ -26,6 +27,7 @@ class ConfirmacaoCodigoScreen extends StatefulWidget {
     required this.messageRepository,
     required this.contactRepository,
     required this.menuRepository,
+    required this.walletRepository,
     required this.email,
   });
 
@@ -34,6 +36,7 @@ class ConfirmacaoCodigoScreen extends StatefulWidget {
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
   final MenuRepository menuRepository;
+  final WalletRepository walletRepository;
   final String email;
 
   @override
@@ -89,6 +92,7 @@ class _ConfirmacaoCodigoScreenState extends State<ConfirmacaoCodigoScreen> {
           messageRepository: widget.messageRepository,
           contactRepository: widget.contactRepository,
           menuRepository: widget.menuRepository,
+          walletRepository: widget.walletRepository,
         ),
       ),
       (route) => false,

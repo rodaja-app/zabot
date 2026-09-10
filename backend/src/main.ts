@@ -31,11 +31,11 @@ function resolveCorsOrigins(): string[] {
 }
 
 async function bootstrap(): Promise<void> {
-  // `rawBody: true` (Etapa 16) preserva os bytes crus do corpo em
-  // `request.rawBody` para TODAS as rotas, além do parse normal em
-  // `request.body` — necessário só por `PlansController.handleRevenueCatWebhook`,
-  // para a verificação HMAC opcional (`RevenueCatWebhookService.verifyHmacSignature`),
-  // que precisa assinar exatamente os bytes recebidos, não uma reserialização.
+  // `rawBody: true` preserva os bytes crus do corpo em `request.rawBody` para
+  // TODAS as rotas, além do parse normal em `request.body` — reservado para
+  // a verificação de assinatura do webhook de pagamento Pix/Mercado Pago
+  // (carteira de créditos), que precisa assinar exatamente os bytes
+  // recebidos, não uma reserialização.
   const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
 
   const logger = app.get(Logger);

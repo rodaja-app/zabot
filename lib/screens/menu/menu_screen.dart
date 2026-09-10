@@ -8,25 +8,24 @@ import '../../data/menu_repository.dart';
 import '../../data/message_repository.dart';
 import '../../data/models/app_info.dart';
 import '../../data/models/app_settings.dart';
-import '../../data/models/payment_history_entry.dart';
-import '../../data/models/plan_option.dart';
-import '../../data/models/plan_purchase_exception.dart';
-import '../../data/models/subscription_plan.dart';
 import '../../data/models/user_account.dart';
+import '../../data/models/wallet.dart';
+import '../../data/wallet_repository.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/status_badge.dart';
 import '../auth/login_screen.dart';
+import '../wallet/wallet_recharge_screen.dart';
 
 /// Tela Menu (Etapa 6, README.md seção 13).
 ///
-/// Conta, plano/assinatura, configurações e conexão do WhatsApp — tudo sobre
-/// [MenuRepository] e [ConnectionRepository] mockados. A gestão da conexão
-/// (conectar/desconectar) continua exclusiva da Tela Início; aqui ela só é
-/// exibida em modo leitura, para evitar dois pontos de mutação para o mesmo
-/// estado.
+/// Conta, carteira de créditos, configurações e conexão do WhatsApp — tudo
+/// sobre [MenuRepository]/[WalletRepository] e [ConnectionRepository]
+/// mockados. A gestão da conexão (conectar/desconectar) continua exclusiva
+/// da Tela Início; aqui ela só é exibida em modo leitura, para evitar dois
+/// pontos de mutação para o mesmo estado.
 ///
 /// Recebe também [messageRepository] e [contactRepository] só para poder
 /// reconstruir a árvore de navegação até [LoginScreen] no logout (mesmo
@@ -39,6 +38,7 @@ class MenuScreen extends StatefulWidget {
     required this.authRepository,
     required this.messageRepository,
     required this.contactRepository,
+    required this.walletRepository,
   });
 
   final MenuRepository menuRepository;
@@ -46,6 +46,7 @@ class MenuScreen extends StatefulWidget {
   final AuthRepository authRepository;
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
+  final WalletRepository walletRepository;
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -53,7 +54,7 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   Future<UserAccount>? _accountFuture;
-  Future<SubscriptionPlan>? _planFuture;
+  Future<Wallet>? _walletFuture;
   Future<AppInfo>? _appInfoFuture;
   AppSettings? _settings;
 
@@ -64,7 +65,7 @@ class _MenuScreenState extends State<MenuScreen> {
   void initState() {
     super.initState();
     _loadAccount();
-    _planFuture = widget.menuRepository.getPlan();
+    _refreshWallet();
     _appInfoFuture = widget.menuRepository.getAppInfo();
     widget.menuRepository.getSettings().then((settings) {
       if (!mounted) return;
@@ -83,8 +84,22 @@ class _MenuScreenState extends State<MenuScreen> {
     widget.menuRepository.updateSettings(settings);
   }
 
-  void _refreshPlan() {
-    setState(() => _planFuture = widget.menuRepository.getPlan());
+  void _refreshWallet() {
+    setState(() => _walletFuture = widget.walletRepository.getBalance());
+  }
+
+  /// Abre a tela de recarga; ao voltar (`Navigator.pop(true)` em
+  /// `WalletRechargeScreen._finish`), o saldo é buscado de novo — evita
+  /// mostrar o saldo desatualizado depois de uma recarga concluída.
+  Future<void> _openWalletRecharge() async {
+    final refreshed = await Navigator.of(context).push<bool>(
+      AppPageRoute(
+        builder: (_) => WalletRechargeScreen(
+          walletRepository: widget.walletRepository,
+        ),
+      ),
+    );
+    if (refreshed == true) _refreshWallet();
   }
 
   Future<void> _goToLogin() async {
@@ -97,6 +112,7 @@ class _MenuScreenState extends State<MenuScreen> {
           messageRepository: widget.messageRepository,
           contactRepository: widget.contactRepository,
           menuRepository: widget.menuRepository,
+          walletRepository: widget.walletRepository,
         ),
       ),
       (route) => false,
@@ -128,11 +144,10 @@ class _MenuScreenState extends State<MenuScreen> {
           onRetry: _loadAccount,
         ),
         const SizedBox(height: 24),
-        _PlanCard(
-          planFuture: _planFuture,
+        _WalletCard(
+          walletFuture: _walletFuture,
           l10n: l10n,
-          menuRepository: widget.menuRepository,
-          onPlanChanged: _refreshPlan,
+          onTap: _openWalletRecharge,
         ),
         const SizedBox(height: 24),
         _SettingsCard(
@@ -266,275 +281,30 @@ class _AccountCard extends StatelessWidget {
   }
 }
 
-class _PlanCard extends StatelessWidget {
-  const _PlanCard({
-    required this.planFuture,
+/// Cartão destacado (degradê roxo→verde) exibindo o saldo de créditos —
+/// fica logo abaixo de "Minha Conta" para dar mais peso visual à carteira.
+/// Substitui o antigo `_PlanCard`/RevenueCat: em vez de abrir um diálogo de
+/// detalhes, o toque leva direto para [WalletRechargeScreen] (o fluxo de
+/// recarga precisa de tela cheia, por causa do QR code + polling, o que não
+/// cabe bem num modal).
+class _WalletCard extends StatelessWidget {
+  const _WalletCard({
+    required this.walletFuture,
     required this.l10n,
-    required this.menuRepository,
-    required this.onPlanChanged,
+    required this.onTap,
   });
 
-  final Future<SubscriptionPlan>? planFuture;
+  final Future<Wallet>? walletFuture;
   final AppLocalizations l10n;
-  final MenuRepository menuRepository;
-  final VoidCallback onPlanChanged;
+  final VoidCallback onTap;
 
-  // Antes chamava menuRepository.getAvailablePlans() direto no `future:` do
-  // FutureBuilder dentro do diálogo — isso buscava os dados de novo (e
-  // piscava loading) toda vez que o modal era aberto. Agora aguardamos a
-  // busca antes de abrir o diálogo, que já nasce pronto.
-  Future<void> _showComparePlansDialog(BuildContext context) async {
-    final plans = await menuRepository.getAvailablePlans();
-    if (!context.mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.menu_plan_compare_dialog_title),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final plan in plans)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(plan.name),
-                  subtitle: Text(
-                    '${plan.priceLabel}\n'
-                    '${l10n.menu_plan_description(plan.messagesLimit)}',
-                  ),
-                  trailing: plan.isCurrent
-                      ? StatusBadge(
-                          status: AppStatus.connected,
-                          label: l10n.menu_plan_status_active,
-                        )
-                      : null,
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.common_cancel),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showChangePlanDialog(BuildContext context) async {
-    final plans = await menuRepository.getAvailablePlans();
-    if (!context.mounted) return;
-
-    final selectedId = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.menu_plan_change_dialog_title),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final plan in plans)
-                RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  value: plan.id,
-                  groupValue: null,
-                  title: Text(plan.name),
-                  subtitle: Text(plan.priceLabel),
-                  onChanged: (value) =>
-                      Navigator.of(dialogContext).pop(value),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.common_cancel),
-          ),
-        ],
-      ),
-    );
-
-    if (selectedId == null) return;
-
-    // A compra passa pela folha de pagamento nativa (RevenueCat/loja) — o
-    // usuário pode cancelar a qualquer momento, o que é normal e não deve
-    // exibir erro (PlanPurchaseException.cancelled). Qualquer outra falha
-    // (rede, produto indisponível etc.) mostra um snackbar.
-    try {
-      await menuRepository.changePlan(selectedId);
-      onPlanChanged();
-    } on PlanPurchaseException catch (error) {
-      if (error.cancelled) return;
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.menu_plan_purchase_error)),
-      );
-    }
-  }
-
-  // Mesma correção do diálogo de comparar planos: busca antes de abrir o
-  // modal, em vez de buscar de novo (com flash de loading) a cada abertura.
-  Future<void> _showPaymentHistoryDialog(BuildContext context) async {
-    final entries = await menuRepository.getPaymentHistory();
-    if (!context.mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.menu_plan_payment_history_dialog_title),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: entries.isEmpty
-              ? Text(l10n.menu_plan_payment_history_empty)
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final entry in entries)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(entry.amountLabel),
-                        subtitle: Text(entry.dateLabel),
-                        trailing: StatusBadge(
-                          status: entry.status,
-                          label: _paymentStatusLabel(entry.status),
-                        ),
-                      ),
-                  ],
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.common_cancel),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _paymentStatusLabel(AppStatus status) {
-    switch (status) {
-      case AppStatus.sent:
-        return l10n.menu_plan_payment_status_paid;
-      case AppStatus.pending:
-        return l10n.menu_plan_payment_status_pending;
-      case AppStatus.failed:
-        return l10n.menu_plan_payment_status_failed;
-      case AppStatus.connected:
-        return l10n.menu_plan_payment_status_paid;
-    }
-  }
-
-  String _statusLabel(AppStatus status) {
-    switch (status) {
-      case AppStatus.connected:
-        return l10n.menu_plan_status_active;
-      case AppStatus.pending:
-        return l10n.menu_plan_status_trial;
-      case AppStatus.failed:
-        return l10n.menu_plan_status_expired;
-      case AppStatus.sent:
-        return l10n.menu_plan_status_active;
-    }
-  }
-
-  /// Detalhes (preço, uso, ações) só aparecem no modal ao clicar no cartão —
-  /// a barra de progresso roxa antiga saiu por ser redundante com o texto de
-  /// uso logo abaixo dela.
-  // Mesma correção: aguarda o Future (já cacheado no state da tela) antes
-  // de abrir o modal, em vez de resolver dentro de um FutureBuilder — que
-  // sempre pisca "waiting" por um frame mesmo com o Future já pronto.
-  Future<void> _showPlanDetailsDialog(BuildContext context) async {
-    if (planFuture == null) return;
-    final plan = await planFuture!;
-    if (!context.mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.menu_plan_card_title),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    plan.name,
-                    style: Theme.of(dialogContext).textTheme.bodyLarge,
-                  ),
-                  StatusBadge(
-                    status: plan.status,
-                    label: _statusLabel(plan.status),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                plan.priceLabel,
-                style: Theme.of(dialogContext).textTheme.bodyMedium,
-              ),
-              Text(
-                l10n.menu_plan_renews_on(plan.renewalDateLabel),
-                style: Theme.of(dialogContext).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.menu_plan_usage_label(
-                  plan.messagesUsed,
-                  plan.messagesLimit,
-                ),
-                style: Theme.of(dialogContext).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => _showComparePlansDialog(context),
-                    child: Text(l10n.menu_plan_compare_button),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _showPaymentHistoryDialog(context),
-                    child: Text(l10n.menu_plan_payment_history_button),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => _showChangePlanDialog(context),
-                    child: Text(l10n.menu_plan_change_button),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.common_cancel),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Cartão destacado (degradê roxo→verde) — fica logo abaixo de "Minha
-  /// Conta" para dar mais peso visual ao Plano e assinatura.
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _showPlanDetailsDialog(context),
+        onTap: onTap,
         child: Ink(
           decoration: BoxDecoration(
             gradient: AppColors.heroGradient,
@@ -549,18 +319,20 @@ class _PlanCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        l10n.menu_plan_card_title,
+                        l10n.wallet_card_title,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 4),
-                      FutureBuilder<SubscriptionPlan>(
-                        future: planFuture,
+                      FutureBuilder<Wallet>(
+                        future: walletFuture,
                         builder: (context, snapshot) {
                           if (!snapshot.hasData) {
                             return const SizedBox.shrink();
                           }
                           return Text(
-                            snapshot.data!.name,
+                            l10n.wallet_card_balance_label(
+                              snapshot.data!.balance,
+                            ),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: AppColors.textPrimary),
                           );
