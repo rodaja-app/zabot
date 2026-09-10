@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/api/api_exception.dart';
 import '../../data/auth_repository.dart';
 import '../../data/connection_repository.dart';
 import '../../data/contact_repository.dart';
@@ -48,6 +49,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
 
   bool _isSubmitting = false;
   String? _passwordError;
+  String? _formError;
 
   @override
   void dispose() {
@@ -68,16 +70,38 @@ class _CadastroScreenState extends State<CadastroScreen> {
 
     setState(() {
       _passwordError = null;
+      _formError = null;
       _isSubmitting = true;
     });
 
     final email = _emailController.text.trim();
 
-    await widget.authRepository.register(
-      name: _nameController.text.trim(),
-      email: email,
-      password: _passwordController.text,
-    );
+    try {
+      await widget.authRepository.register(
+        name: _nameController.text.trim(),
+        email: email,
+        password: _passwordController.text,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _formError = e.isConflict
+            ? l10n.auth_cadastro_email_in_use_error
+            : l10n.auth_cadastro_network_error;
+      });
+      return;
+    } on Exception {
+      // Erro de rede (sem resposta do backend) ou qualquer outra falha
+      // inesperada — sem isto, o botão ficava travado em "Carregando..."
+      // pra sempre (exceção propagava sem ninguém desligar _isSubmitting).
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _formError = l10n.auth_cadastro_network_error;
+      });
+      return;
+    }
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
@@ -134,6 +158,13 @@ class _CadastroScreenState extends State<CadastroScreen> {
                 errorText: _passwordError,
                 textInputAction: TextInputAction.done,
               ),
+              if (_formError != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _formError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
               const SizedBox(height: 24),
               AppButton(
                 label: _isSubmitting

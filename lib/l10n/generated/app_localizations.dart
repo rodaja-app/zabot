@@ -196,6 +196,18 @@ abstract class AppLocalizations {
   /// **'Já tem uma conta? Entrar'**
   String get auth_cadastro_login_link;
 
+  /// Erro exibido quando o backend responde 409 (email já cadastrado) no Cadastro
+  ///
+  /// In pt, this message translates to:
+  /// **'Este email já está cadastrado'**
+  String get auth_cadastro_email_in_use_error;
+
+  /// Erro exibido quando a requisição de Cadastro falha por problema de rede/conexão
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.'**
+  String get auth_cadastro_network_error;
+
   /// Título da tela de Confirmação de código
   ///
   /// In pt, this message translates to:

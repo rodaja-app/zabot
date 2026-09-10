@@ -20,10 +20,9 @@ class ApiAuthRepository implements AuthRepository {
   }) async {
     // Backend responde 409 (ConflictException) quando já existe conta
     // CONFIRMADA com este email (AuthService.register — conta pendente é
-    // reaproveitada silenciosamente, não gera conflito). A tela de Cadastro
-    // ainda não trata nenhum erro aqui (o mock nunca lançava, ver
-    // `cadastro_screen.dart`), então por ora isto só propaga a exceção; sinalizado
-    // como pendência para a tarefa de wiring final (Etapa 18).
+    // reaproveitada silenciosamente, não gera conflito). Propaga a exceção
+    // (ApiException/ApiNetworkException) — `cadastro_screen.dart` trata os
+    // dois casos (409 → "email já cadastrado", resto → erro de rede/conexão).
     await _apiClient.post('/auth/register', body: {
       'name': name,
       'email': email,

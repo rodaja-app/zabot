@@ -61,6 +61,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get auth_cadastro_login_link => 'Já tem uma conta? Entrar';
 
   @override
+  String get auth_cadastro_email_in_use_error => 'Este email já está cadastrado';
+
+  @override
+  String get auth_cadastro_network_error =>
+      'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.';
+
+  @override
   String get auth_codigo_title => 'Confirme seu email';
 
   @override

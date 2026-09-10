@@ -23,7 +23,10 @@ class ApiClient {
   })  : _http = httpClient ?? http.Client(),
         tokenStore = tokenStore ?? AuthTokenStore(),
         baseUrl = baseUrl ??
-            const String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:3000');
+            const String.fromEnvironment(
+              'API_BASE_URL',
+              defaultValue: 'https://zabot-production.up.railway.app',
+            );
 
   final http.Client _http;
   final AuthTokenStore tokenStore;

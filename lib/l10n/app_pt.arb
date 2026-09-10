@@ -74,6 +74,14 @@
   "@auth_cadastro_submit_button": {
     "description": "Botão de envio do formulário de Cadastro"
   },
+  "auth_cadastro_email_in_use_error": "Este email já está cadastrado",
+  "@auth_cadastro_email_in_use_error": {
+    "description": "Erro exibido quando o backend responde 409 (email já cadastrado) no Cadastro"
+  },
+  "auth_cadastro_network_error": "Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.",
+  "@auth_cadastro_network_error": {
+    "description": "Erro exibido quando a requisição de Cadastro falha por problema de rede/conexão"
+  },
   "auth_cadastro_login_link": "Já tem uma conta? Entrar",
   "@auth_cadastro_login_link": {
     "description": "Link no Cadastro que leva à tela de Login"
