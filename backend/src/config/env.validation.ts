@@ -148,14 +148,19 @@ export const envValidationSchema = Joi.object({
   // Mercado Pago configurada (o resto da carteira, saldo/débito de campanha,
   // não depende destas variáveis). Access token e public key vêm do painel
   // Mercado Pago (Suas integrações > credenciais de produção).
-  MERCADOPAGO_ACCESS_TOKEN: Joi.string().optional(),
-  MERCADOPAGO_PUBLIC_KEY: Joi.string().optional(),
+  // `.allow('')` além de `.optional()`: painéis de env vars (Railway etc.)
+  // costumam salvar uma variável criada sem valor como string vazia, não
+  // como ausente — sem isso o Joi rejeita `MERCADOPAGO_ACCESS_TOKEN=` (linha
+  // em branco no `.env`) com "is not allowed to be empty", derrubando o
+  // boot da aplicação por causa de uma variável que é opcional por design.
+  MERCADOPAGO_ACCESS_TOKEN: Joi.string().allow('').optional(),
+  MERCADOPAGO_PUBLIC_KEY: Joi.string().allow('').optional(),
   // Secret exibido ao configurar a notificação webhook no painel Mercado
   // Pago (Suas integrações > Webhooks) — usado para validar o header
   // `x-signature` de cada notificação (ver MercadoPagoApiService.verifySignature).
-  // Ausente: o webhook aceita notificações sem checar assinatura (permissivo
-  // só para dev local sem domínio público para configurar o webhook de
-  // verdade) — setar sempre em produção, senão qualquer request forjado
-  // creditaria saldo sem pagamento real.
-  MERCADOPAGO_WEBHOOK_SECRET: Joi.string().optional(),
+  // Ausente/vazio: o webhook aceita notificações sem checar assinatura
+  // (permissivo só para dev local sem domínio público para configurar o
+  // webhook de verdade) — setar sempre em produção, senão qualquer request
+  // forjado creditaria saldo sem pagamento real.
+  MERCADOPAGO_WEBHOOK_SECRET: Joi.string().allow('').optional(),
 });
