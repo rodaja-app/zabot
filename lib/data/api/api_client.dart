@@ -72,7 +72,15 @@ class ApiClient {
 
     http.Response response;
     try {
-      response = await _dispatch(method, uri, headers, body);
+      // Sem timeout aqui, um backend travado (ex.: SMTP sem timeout próprio
+      // — ver smtp-email.provider.ts) deixa a Future pendurada pra sempre: a
+      // tela nunca sai de "Carregando...", porque nem sucesso nem os catches
+      // de erro em cadastro_screen.dart (ApiException/Exception) chegam a
+      // disparar. TimeoutException é uma Exception normal, então cai no
+      // catch abaixo e vira ApiNetworkException como qualquer outra falha de
+      // rede.
+      response = await _dispatch(method, uri, headers, body)
+          .timeout(const Duration(seconds: 20));
     } on ApiNetworkException {
       rethrow;
     } on Exception catch (e) {
@@ -122,7 +130,7 @@ class ApiClient {
 
     http.Response response;
     try {
-      final streamed = await _http.send(request);
+      final streamed = await _http.send(request).timeout(const Duration(seconds: 30));
       response = await http.Response.fromStream(streamed);
     } on Exception catch (e) {
       throw ApiNetworkException(e.toString());
