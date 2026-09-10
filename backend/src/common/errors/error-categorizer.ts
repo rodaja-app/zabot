@@ -35,7 +35,11 @@ export function categorizeError(err: unknown): CategorizedError {
       category: err.category,
       message: err.message,
       statusCode: statusForCategory(err.category),
-      details: err.details,
+      // `err.details` sozinho escondia a causa raiz de erros encadeados (ex.:
+      // SmtpEmailProvider embrulha a falha real do nodemailer num AppError —
+      // sem isto, o log só mostrava "Falha ao enviar email via SMTP", nunca
+      // o ECONNREFUSED/ETIMEDOUT/EAUTH que de fato explica o motivo).
+      details: { ...err.details, ...describeCause(err.cause) },
       raw: err,
     };
   }
@@ -109,6 +113,23 @@ function extractHttpExceptionMessage(err: HttpException): string {
   if (typeof message === 'string') return message;
 
   return err.message;
+}
+
+/**
+ * Extrai `message`/`code` da causa original de um `AppError` (ex.: erro cru
+ * do nodemailer/driver de rede) para o log — sem isto, erros encadeados só
+ * mostravam a mensagem genérica do `AppError` que os embrulha, escondendo o
+ * motivo real (ECONNREFUSED, ETIMEDOUT, EAUTH etc.).
+ */
+function describeCause(cause: unknown): Record<string, unknown> {
+  if (!cause) return {};
+  const code = (cause as { code?: string } | undefined)?.code;
+  const message = cause instanceof Error ? cause.message : undefined;
+  if (!code && !message) return {};
+  return {
+    causeCode: code,
+    causeMessage: message,
+  };
 }
 
 function statusForCategory(category: ErrorCategory): number {

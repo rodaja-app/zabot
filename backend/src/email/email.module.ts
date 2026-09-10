@@ -24,6 +24,10 @@ import { SmtpEmailProvider } from './smtp-email.provider';
       inject: [ConfigService, SmtpEmailProvider, LogEmailProvider],
     },
   ],
-  exports: [EMAIL_PROVIDER],
+  // `SmtpEmailProvider` exportado separadamente (além do token `EMAIL_PROVIDER`)
+  // pra `HealthController` poder injetá-lo direto e expor `GET /health/smtp`
+  // — diagnóstico real de SMTP mesmo quando `LogEmailProvider` é quem está
+  // ativo (a instância SMTP existe e pode ser testada de qualquer jeito).
+  exports: [EMAIL_PROVIDER, SmtpEmailProvider],
 })
 export class EmailModule {}

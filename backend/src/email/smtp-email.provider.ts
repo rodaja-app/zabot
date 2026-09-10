@@ -6,10 +6,30 @@ import { AppError } from '../common/errors/app-error';
 import { ErrorCategory } from '../common/errors/error-category.enum';
 import { EmailProvider, SendEmailParams } from './email-provider.interface';
 
+/**
+ * Resultado de `SmtpEmailProvider.verify()` — usado pelo endpoint público
+ * `GET /health/smtp` (ver `health.controller.ts`) pra diagnosticar SMTP em
+ * produção direto pelo navegador, sem precisar gerar um build do app só
+ * pra reproduzir uma falha de cadastro/reenvio de código. Nunca carrega a
+ * senha, só host/porta (dado que já vaza em qualquer erro de rede comum) e
+ * o motivo cru da falha (code/message do nodemailer).
+ */
+export interface SmtpVerifyResult {
+  configured: boolean;
+  ok: boolean;
+  host?: string;
+  port?: number;
+  code?: string;
+  responseCode?: number;
+  message?: string;
+}
+
 @Injectable()
 export class SmtpEmailProvider implements EmailProvider {
   private readonly transporter: Transporter;
   private readonly from: string;
+  private readonly host: string | undefined;
+  private readonly port: number;
 
   constructor(
     private readonly config: ConfigService,
@@ -18,9 +38,11 @@ export class SmtpEmailProvider implements EmailProvider {
     const port = this.config.get<number>('SMTP_PORT') || 587;
     const user = this.config.get<string>('SMTP_USER');
 
+    this.host = this.config.get<string>('SMTP_HOST');
+    this.port = port;
     this.from = this.config.get<string>('SMTP_FROM') || user || 'no-reply@zabot.app';
     this.transporter = createTransport({
-      host: this.config.get<string>('SMTP_HOST'),
+      host: this.host,
       port,
       secure: port === 465,
       auth: user ? { user, pass: this.config.get<string>('SMTP_PASSWORD') } : undefined,
@@ -51,6 +73,29 @@ export class SmtpEmailProvider implements EmailProvider {
         { to: params.to, subject: params.subject },
         err,
       );
+    }
+  }
+
+  /**
+   * Testa a conexão/autenticação SMTP real via `transporter.verify()` do
+   * nodemailer (handshake + auth, sem enviar nenhum email) — é o que dá
+   * pro endpoint `/health/smtp` mostrar o erro cru (ECONNREFUSED, ETIMEDOUT,
+   * EAUTH etc.) que hoje só aparecia embrulhado/escondido no log do
+   * `AppError` do `send()`.
+   */
+  async verify(): Promise<SmtpVerifyResult> {
+    if (!this.host) {
+      return { configured: false, ok: false, host: this.host, port: this.port };
+    }
+
+    try {
+      await this.transporter.verify();
+      return { configured: true, ok: true, host: this.host, port: this.port };
+    } catch (err) {
+      const code = (err as { code?: string } | undefined)?.code;
+      const responseCode = (err as { responseCode?: number } | undefined)?.responseCode;
+      const message = err instanceof Error ? err.message : String(err);
+      return { configured: true, ok: false, host: this.host, port: this.port, code, responseCode, message };
     }
   }
 }
