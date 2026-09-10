@@ -22,7 +22,15 @@ workflows:
         script: xcode-project use-profiles
       - name: Build do IPA
         script: |
+          # --build-number=$PROJECT_BUILD_NUMBER (contador nativo do Codemagic,
+          # incrementa a cada build do projeto, nunca reseta) substitui o "+N"
+          # do pubspec.yaml só pro CFBundleVersion — evita o erro "bundle
+          # version must be higher than the previously uploaded version" toda
+          # vez que um build é reenviado ao TestFlight sem editar o pubspec à
+          # mão antes. O nome da versão (0.2.1) continua vindo do pubspec.yaml
+          # normalmente, sem precisar passar --build-name.
           flutter build ipa --release \
+            --build-number=$PROJECT_BUILD_NUMBER \
             --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
