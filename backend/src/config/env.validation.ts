@@ -60,6 +60,13 @@ export const envValidationSchema = Joi.object({
   SMTP_USER: Joi.string().optional(),
   SMTP_PASSWORD: Joi.string().optional(),
   SMTP_FROM: Joi.string().optional(),
+  // Opcional e independente de SMTP_HOST — se setada, `EmailModule` usa a
+  // API HTTP do Resend (porta 443) em vez de SMTP (porta 587), que ficou
+  // sujeita a ETIMEDOUT de saída no Railway (ver resend-email.provider.ts).
+  // Sem esta variável, mas com SMTP_HOST apontando pro Resend, o app
+  // reaproveita SMTP_PASSWORD como API key automaticamente — só setar isto
+  // se quiser uma key HTTP diferente da usada em SMTP_PASSWORD.
+  RESEND_API_KEY: Joi.string().allow('').optional(),
   // Etapa 13 (README raiz §5 passo 2) — máximo de tentativas reais de
   // verificação contra o WhatsApp por contato (cada tentativa testa em lote
   // até N variações de formato numa única chamada `onWhatsApp`). Esgotado
