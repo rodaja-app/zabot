@@ -86,9 +86,17 @@ class _CadastroScreenState extends State<CadastroScreen> {
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;
-        _formError = e.isConflict
-            ? l10n.auth_cadastro_email_in_use_error
-            : l10n.auth_cadastro_network_error;
+        // 409 (email já cadastrado) tem mensagem própria; 400 (validação,
+        // ex.: senha curta) já vem com uma mensagem pronta e apresentável do
+        // backend (`RegisterDto`) — só o restante (5xx, etc.) cai no genérico
+        // de erro de conexão/servidor.
+        if (e.isConflict) {
+          _formError = l10n.auth_cadastro_email_in_use_error;
+        } else if (e.isValidation) {
+          _formError = e.message;
+        } else {
+          _formError = l10n.auth_cadastro_network_error;
+        }
       });
       return;
     } on Exception {

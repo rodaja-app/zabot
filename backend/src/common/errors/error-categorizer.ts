@@ -50,7 +50,7 @@ export function categorizeError(err: unknown): CategorizedError {
           : status === 429
             ? ErrorCategory.RATE_LIMIT
             : ErrorCategory.DESCONHECIDO;
-    return { category, message: err.message, statusCode: status, raw: err };
+    return { category, message: extractHttpExceptionMessage(err), statusCode: status, raw: err };
   }
 
   const code = (err as { code?: string } | undefined)?.code;
@@ -88,6 +88,27 @@ export function categorizeError(err: unknown): CategorizedError {
 
   const message = err instanceof Error ? err.message : String(err);
   return { category: ErrorCategory.DESCONHECIDO, message, statusCode: 500, raw: err };
+}
+
+/**
+ * O `ValidationPipe` global (main.ts) lança `BadRequestException(errors)`
+ * onde `errors` é um array de mensagens (uma por regra de `class-validator`
+ * violada, ex.: "Senha deve ter ao menos 8 caracteres."). Como o array não é
+ * uma string, `HttpException.initMessage()` não o usa como `.message` — cai
+ * no fallback genérico do nome da classe ("Bad Request Exception"),
+ * escondendo o motivo real que o front precisa mostrar ao usuário. Aqui
+ * extraímos a mensagem de verdade direto do corpo da resposta
+ * (`err.getResponse()`), já que é lá que o array realmente está.
+ */
+function extractHttpExceptionMessage(err: HttpException): string {
+  const response = err.getResponse();
+  if (typeof response === 'string') return response;
+
+  const message = (response as Record<string, unknown>)?.message;
+  if (Array.isArray(message)) return message.join(' ');
+  if (typeof message === 'string') return message;
+
+  return err.message;
 }
 
 function statusForCategory(category: ErrorCategory): number {
