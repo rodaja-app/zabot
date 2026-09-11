@@ -110,6 +110,31 @@ export class ProxyConfigService {
   }
 
   /**
+   * Monta agents de teste direto das env vars do DataImpulse, sem persistir
+   * nada no banco nem vincular a uma sessão real — usado só pelo
+   * diagnóstico `GET /health/whatsapp` pra confirmar, com uma URL no
+   * navegador, se o Railway consegue falar com o proxy (e através dele com
+   * o WhatsApp) sem precisar abrir uma sessão de verdade no app. `undefined`
+   * quando o proxy está desabilitado (mesma regra de `isEnabled`).
+   */
+  buildTestAgents(): ProxyAgents | undefined {
+    if (!this.isEnabled) return undefined;
+
+    const username = this.config.getOrThrow<string>('DATAIMPULSE_USERNAME');
+    const password = this.config.getOrThrow<string>('DATAIMPULSE_PASSWORD');
+    const host = this.config.getOrThrow<string>('DATAIMPULSE_HOST');
+    const protocol = (this.config.get<string>('DATAIMPULSE_PROTOCOL') ?? 'SOCKS5') as ProxyProtocol;
+    const port = this.config.get<number>('DATAIMPULSE_PORT') ?? (protocol === ProxyProtocol.SOCKS5 ? 824 : 823);
+
+    const stickyUsername = `${username}__sessid.${randomStickyKey()}`;
+    const auth = `${encodeURIComponent(stickyUsername)}:${encodeURIComponent(password)}`;
+    const url = `${protocol === ProxyProtocol.SOCKS5 ? 'socks5' : 'http'}://${auth}@${host}:${port}`;
+
+    const agent: Agent = protocol === ProxyProtocol.SOCKS5 ? new SocksProxyAgent(url) : new HttpsProxyAgent(url);
+    return { agent, fetchAgent: agent };
+  }
+
+  /**
    * Testa conectividade real através do proxy antes de abrir o socket
    * Baileys — falha de proxy é tratada como falha de conexão (README §4),
    * então precisa de uma causa categorizada, nunca um erro genérico.

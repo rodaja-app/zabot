@@ -1,8 +1,10 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Logger } from 'nestjs-pino';
+import { fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import { ResendEmailProvider } from '../email/resend-email.provider';
 import { SmtpEmailProvider } from '../email/smtp-email.provider';
+import { ProxyConfigService } from '../whatsapp/proxy-config.service';
 import { HealthService } from './health.service';
 
 /**
@@ -23,6 +25,7 @@ export class HealthController {
     private readonly logger: Logger,
     private readonly smtp: SmtpEmailProvider,
     private readonly resend: ResendEmailProvider,
+    private readonly proxyConfig: ProxyConfigService,
   ) {}
 
   @Get()
@@ -63,6 +66,60 @@ export class HealthController {
 
     res.status(result.ok ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).json({
       ...result,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Diagnóstico de conexão WhatsApp acessível direto pelo navegador — criado
+   * pra depurar "não conecta nem por QR nem por telefone" em produção sem
+   * precisar gerar um build novo pra reproduzir. Cobre os dois pontos que
+   * `BaileysWhatsAppProvider.startSession` precisa antes de sequer mostrar
+   * QR/código: (1) conectividade real através do proxy DataImpulse — mesmo
+   * teste (`ProxyConfigService.testConnectivity`) feito antes de abrir o
+   * socket, mas aqui com um agent descartável, sem tocar em sessão real; e
+   * (2) se o backend consegue buscar a versão mais recente do protocolo
+   * WhatsApp Web (`fetchLatestBaileysVersion`) — sem isso, o Baileys usa uma
+   * versão desatualizada embutida na lib e o handshake cai logo depois de
+   * abrir (o padrão "conecta e cai por timeout" visto nos logs).
+   */
+  @Get('whatsapp')
+  async checkWhatsapp(@Res() res: Response): Promise<void> {
+    const proxyEnabled = this.proxyConfig.isEnabled;
+    const proxyResult = proxyEnabled
+      ? await (async () => {
+          try {
+            const agents = this.proxyConfig.buildTestAgents();
+            return agents
+              ? await this.proxyConfig.testConnectivity(agents)
+              : { ok: false, error: 'proxy_agent_build_failed' };
+          } catch (err) {
+            return { ok: false, error: err instanceof Error ? err.message : String(err) };
+          }
+        })()
+      : { ok: true, error: undefined };
+
+    let baileysVersion: { ok: boolean; version?: string; isLatest?: boolean; error?: string };
+    try {
+      const { version, isLatest } = await fetchLatestBaileysVersion();
+      baileysVersion = { ok: true, version: version.join('.'), isLatest };
+    } catch (err) {
+      baileysVersion = { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+
+    const ok = proxyResult.ok && baileysVersion.ok;
+
+    if (!ok) {
+      this.logger.warn(
+        { event: 'whatsapp_diagnostic_failed', proxyEnabled, proxyResult, baileysVersion },
+        'Diagnóstico WhatsApp falhou',
+      );
+    }
+
+    res.status(ok ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).json({
+      ok,
+      proxy: { enabled: proxyEnabled, ...proxyResult },
+      baileysVersion,
       timestamp: new Date().toISOString(),
     });
   }

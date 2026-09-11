@@ -33,6 +33,9 @@ import { WhatsAppProvider } from './whatsapp-provider.interface';
   // (SendingModule, que já importa este módulo) reaproveita o mesmo socket/room
   // por usuário para emitir progresso de campanha em tempo real, em vez de abrir
   // um segundo canal WebSocket.
-  exports: [SessionService, WhatsAppProvider, SessionGateway],
+  // ProxyConfigService exportado pra `HealthModule` poder expor
+  // `GET /health/whatsapp` — diagnóstico de proxy/DataImpulse acessível pelo
+  // navegador, mesmo motivo/padrão de `GET /health/smtp`.
+  exports: [SessionService, WhatsAppProvider, SessionGateway, ProxyConfigService],
 })
 export class WhatsAppModule {}
