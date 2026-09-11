@@ -561,32 +561,29 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
             if (_isLoadingContacts)
               AppLoadingView(label: l10n.common_loading)
             else if (personalizationIds.isEmpty)
-              Text(
-                l10n.messages_nova_campanha_personalization_empty,
-                style: Theme.of(context).textTheme.bodyMedium,
-              )
+              _PersonalizationGuide(l10n: l10n)
             else ...[
-              Text(
-                l10n.messages_nova_campanha_personalization_hint,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final id in personalizationIds)
-                    ActionChip(
-                      label: Text('{$id}'),
-                      backgroundColor: AppColors.surfaceCard,
-                      side: const BorderSide(color: AppColors.borderDivider),
-                      labelStyle: const TextStyle(
-                        color: AppColors.textPrimary,
+                Text(
+                  l10n.messages_nova_campanha_personalization_hint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final id in personalizationIds)
+                      ActionChip(
+                        label: Text('{$id}'),
+                        backgroundColor: AppColors.surfaceCard,
+                        side: const BorderSide(color: AppColors.borderDivider),
+                        labelStyle: const TextStyle(
+                          color: AppColors.textPrimary,
+                        ),
+                        onPressed: () => _insertText('{$id}'),
                       ),
-                      onPressed: () => _insertText('{$id}'),
-                    ),
-                ],
-              ),
+                  ],
+                ),
             ],
             const SizedBox(height: 24),
             _CampaignSectionTitle(
@@ -989,6 +986,124 @@ class _CampaignSectionTitle extends StatelessWidget {
               style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w700),
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// Guia mostrado quando os contatos ainda não possuem campos ID. Em vez de
+/// uma mensagem passiva de "não encontrado", ensina o caminho completo para
+/// salvar o dado e usar a personalização na campanha.
+class _PersonalizationGuide extends StatelessWidget {
+  const _PersonalizationGuide({required this.l10n});
+
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2B2545), Color(0xFF182E29)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.greenPrimary.withOpacity(0.38)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.tips_and_updates_rounded,
+                color: AppColors.greenPrimary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.messages_nova_campanha_personalization_guide_title,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n.messages_nova_campanha_personalization_guide_description,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 14),
+          _GuideLine(
+            number: '1',
+            text: l10n.messages_nova_campanha_personalization_guide_step_one,
+          ),
+          const SizedBox(height: 8),
+          _GuideLine(
+            number: '2',
+            text: l10n.messages_nova_campanha_personalization_guide_step_two,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            l10n.messages_nova_campanha_personalization_guide_example_label,
+            style: const TextStyle(
+              color: AppColors.greenPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.background.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              l10n.messages_nova_campanha_personalization_guide_example,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GuideLine extends StatelessWidget {
+  const _GuideLine({required this.number, required this.text});
+
+  final String number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: AppColors.purplePrimary,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            number,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
       ],
     );
   }

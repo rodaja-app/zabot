@@ -171,6 +171,15 @@ class _CampaignsTabState extends State<_CampaignsTab> {
     );
   }
 
+  Future<void> _openContactsDirectory() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ContactsDirectoryDialog(
+        contactRepository: widget.contactRepository,
+      ),
+    );
+  }
+
   Future<void> _openCampanhasEnviadas() async {
     await Navigator.of(context).push(
       AppPageRoute(
@@ -256,14 +265,20 @@ class _CampaignsTabState extends State<_CampaignsTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppButton(
+            label: l10n.messages_campaigns_new_button,
+            onPressed: _openNovaCampanha,
+            expand: false,
+          ),
+          const SizedBox(height: 12),
+          AppButton(
             label: l10n.messages_contacts_import_button,
             onPressed: _handleImportContacts,
             expand: false,
           ),
           const SizedBox(height: 12),
           AppButton(
-            label: l10n.messages_campaigns_new_button,
-            onPressed: _openNovaCampanha,
+            label: l10n.messages_contacts_directory_button,
+            onPressed: _openContactsDirectory,
             expand: false,
           ),
           if (sentCount > 0) ...[
@@ -519,6 +534,226 @@ class _MiniStat extends StatelessWidget {
           label,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+/// Modal de consulta rápida dos contatos importados. Fica acessível já na
+/// primeira tela de Mensagens, sem obrigar a pessoa a descobrir a outra aba
+/// ou entrar no fluxo de criação de campanha.
+class _ContactsDirectoryDialog extends StatefulWidget {
+  const _ContactsDirectoryDialog({required this.contactRepository});
+
+  final ContactRepository contactRepository;
+
+  @override
+  State<_ContactsDirectoryDialog> createState() =>
+      _ContactsDirectoryDialogState();
+}
+
+class _ContactsDirectoryDialogState extends State<_ContactsDirectoryDialog> {
+  final _searchController = TextEditingController();
+  List<Contact> _contacts = [];
+  bool _isLoading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() => setState(() {}));
+    _loadContacts();
+  }
+
+  Future<void> _loadContacts() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    try {
+      final contacts = await widget.contactRepository.getContacts();
+      if (!mounted) return;
+      setState(() {
+        _contacts = contacts;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<Contact> get _filteredContacts {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return _contacts;
+    return _contacts
+        .where(
+          (contact) =>
+              contact.displayLabel.toLowerCase().contains(query) ||
+              contact.phone.toLowerCase().contains(query),
+        )
+        .toList();
+  }
+
+  Future<void> _editContact(Contact contact) async {
+    final contacts = await showDialog<List<Contact>>(
+      context: context,
+      builder: (_) => _EditContactDialog(
+        contact: contact,
+        contactRepository: widget.contactRepository,
+      ),
+    );
+    if (contacts == null || !mounted) return;
+    setState(() => _contacts = contacts);
+  }
+
+  Future<void> _removeContact(Contact contact) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surfaceCard,
+        title: Text(l10n.common_remove),
+        content: Text(contact.displayLabel),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.common_cancel),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.statusError),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.common_remove),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final contacts = await widget.contactRepository.removeContact(contact.id);
+      if (!mounted) return;
+      setState(() => _contacts = contacts);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.common_error_message)),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final contacts = _filteredContacts;
+    return AlertDialog(
+      backgroundColor: AppColors.surfaceCard,
+      title: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.greenPrimary.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.people_alt_rounded,
+              color: AppColors.greenPrimary,
+              size: 19,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(l10n.messages_contacts_directory_title)),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 440,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.messages_contacts_directory_description,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: l10n.messages_contacts_search_hint,
+              controller: _searchController,
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _isLoading
+                  ? AppLoadingView(label: l10n.common_loading)
+                  : _hasError
+                  ? AppErrorView(
+                      message: l10n.common_error_message,
+                      retryLabel: l10n.common_retry,
+                      onRetry: _loadContacts,
+                    )
+                  : contacts.isEmpty
+                  ? AppEmptyView(message: l10n.messages_contacts_empty)
+                  : ListView.separated(
+                      itemCount: contacts.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final contact = contacts[index];
+                        final hasName = contact.displayLabel != contact.phone;
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          onTap: () => _editContact(contact),
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.purplePrimary
+                                .withOpacity(0.22),
+                            child: Text(
+                              contact.displayLabel.substring(0, 1).toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          title: Text(contact.displayLabel),
+                          subtitle: hasName ? Text(contact.phone) : null,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: l10n.common_save,
+                                onPressed: () => _editContact(contact),
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                              IconButton(
+                                tooltip: l10n.common_remove,
+                                onPressed: () => _removeContact(contact),
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: AppColors.statusError,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.common_cancel),
         ),
       ],
     );

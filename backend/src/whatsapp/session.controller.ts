@@ -19,7 +19,7 @@ export class SessionController {
 
   @Get()
   async getSession(@CurrentUserId() userId: string): Promise<SessionDto> {
-    const session = await this.sessionService.getOrCreateSession(userId);
+    const session = await this.sessionService.getSessionSnapshot(userId);
     return toSessionDto(session);
   }
 
@@ -55,11 +55,15 @@ function toSessionDto(session: {
   name: string;
   phoneNumber: string | null;
   status: SessionDto['status'];
+  qr?: string;
+  pairingCode?: string;
 }): SessionDto {
   return {
     sessionId: session.id,
     name: session.name,
     phoneNumber: session.phoneNumber,
     status: session.status,
+    qr: session.qr,
+    pairingCode: session.pairingCode,
   };
 }

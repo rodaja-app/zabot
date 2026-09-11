@@ -303,6 +303,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get messages_contacts_import_button => 'Importar contatos';
 
   @override
+  String get messages_contacts_directory_button => 'Contatos importados';
+
+  @override
+  String get messages_contacts_directory_title => 'Contatos importados';
+
+  @override
+  String get messages_contacts_directory_description =>
+      'Pesquise, edite ou remova um contato antes de iniciar uma campanha.';
+
+  @override
   String get messages_contacts_search_hint => 'Buscar contato';
 
   @override
@@ -422,6 +432,30 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get messages_nova_campanha_personalization_empty =>
       'Nenhum dado de personalização disponível nos contatos importados.';
+
+  @override
+  String get messages_nova_campanha_personalization_guide_title =>
+      'Faça cada mensagem parecer pessoal';
+
+  @override
+  String get messages_nova_campanha_personalization_guide_description =>
+      'Use {ID1} para trocar o marcador pelo dado salvo em cada contato, como o nome.';
+
+  @override
+  String get messages_nova_campanha_personalization_guide_step_one =>
+      'Ao importar um contato, salve o nome no campo ID1.';
+
+  @override
+  String get messages_nova_campanha_personalization_guide_step_two =>
+      'Depois, toque em {ID1} aqui para inserir o nome na sua mensagem.';
+
+  @override
+  String get messages_nova_campanha_personalization_guide_example_label =>
+      'EXEMPLO DE MENSAGEM';
+
+  @override
+  String get messages_nova_campanha_personalization_guide_example =>
+      'Contato salvo: Ana no ID1\nMensagem: Olá, {ID1}! Temos uma novidade para você.';
 
   @override
   String get messages_nova_campanha_personalization_hint =>

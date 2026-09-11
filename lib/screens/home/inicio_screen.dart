@@ -31,7 +31,10 @@ import '../wallet/wallet_recharge_screen.dart';
 /// [ConnectionRepository] mockado — trocar pela implementação real só na
 /// Etapa 17 (integração final).
 class InicioScreen extends StatefulWidget {
-  const InicioScreen({super.key, required this.connectionRepository, required this.walletRepository});
+  const InicioScreen(
+      {super.key,
+      required this.connectionRepository,
+      required this.walletRepository});
 
   final ConnectionRepository connectionRepository;
   final WalletRepository walletRepository;
@@ -69,6 +72,7 @@ class _InicioScreenState extends State<InicioScreen> {
   String? _pairingCode;
   StreamSubscription<String?>? _pairingCodeSubscription;
   bool _qrDialogOpen = false;
+  bool _phoneDialogOpen = false;
   Future<Wallet>? _walletFuture;
 
   @override
@@ -89,9 +93,10 @@ class _InicioScreenState extends State<InicioScreen> {
           _pairingCode = null;
         }
       });
-      if (status != ZapConnectionStatus.connecting && _qrDialogOpen) {
+      if (status != ZapConnectionStatus.connecting &&
+          (_qrDialogOpen || _phoneDialogOpen)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !_qrDialogOpen) return;
+          if (!mounted || (!_qrDialogOpen && !_phoneDialogOpen)) return;
           Navigator.of(context, rootNavigator: true).pop();
         });
       }
@@ -114,8 +119,8 @@ class _InicioScreenState extends State<InicioScreen> {
     });
 
     _pairingCode = widget.connectionRepository.currentPairingCode;
-    _pairingCodeSubscription = widget.connectionRepository.pairingCodeStream
-        .listen((pairingCode) {
+    _pairingCodeSubscription =
+        widget.connectionRepository.pairingCodeStream.listen((pairingCode) {
       if (!mounted) return;
       setState(() => _pairingCode = pairingCode);
     });
@@ -156,11 +161,14 @@ class _InicioScreenState extends State<InicioScreen> {
     }
   }
 
-  void _refreshWallet() => setState(() => _walletFuture = widget.walletRepository.getBalance());
+  void _refreshWallet() =>
+      setState(() => _walletFuture = widget.walletRepository.getBalance());
 
   Future<void> _openWalletRecharge() async {
     final refreshed = await Navigator.of(context).push<bool>(
-      AppPageRoute(builder: (_) => WalletRechargeScreen(walletRepository: widget.walletRepository)),
+      AppPageRoute(
+          builder: (_) =>
+              WalletRechargeScreen(walletRepository: widget.walletRepository)),
     );
     if (refreshed == true) _refreshWallet();
   }
@@ -287,7 +295,7 @@ class _InicioScreenState extends State<InicioScreen> {
           _pairingCode = null;
         });
         _showQrConnectionDialog(context, l10n);
-        await widget.connectionRepository.connect();
+        await _startConnection(l10n);
         break;
       case _ConnectOption.phoneNumber:
         final phoneNumber = await _promptPhoneNumber(context);
@@ -299,8 +307,47 @@ class _InicioScreenState extends State<InicioScreen> {
           _qrCode = null;
           _pairingCode = null;
         });
-        await widget.connectionRepository.connect(phoneNumber: phoneNumber);
+        _showPhonePairingDialog(context, l10n);
+        await _startConnection(l10n, phoneNumber: phoneNumber);
         break;
+    }
+  }
+
+  Future<void> _startConnection(
+    AppLocalizations l10n, {
+    String? phoneNumber,
+  }) async {
+    try {
+      await widget.connectionRepository.connect(phoneNumber: phoneNumber);
+    } catch (_) {
+      if (!mounted) return;
+      await _cancelConnecting(showError: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.common_error_message)),
+      );
+    }
+  }
+
+  Future<void> _cancelConnecting({bool showError = false}) async {
+    // Fecha imediatamente, antes da chamada de rede. Assim um QR expirado ou
+    // uma API lenta nunca deixa a pessoa presa em um diálogo bloqueante.
+    final shouldCloseDialog = _qrDialogOpen || _phoneDialogOpen;
+    _qrDialogOpen = false;
+    _phoneDialogOpen = false;
+    if (shouldCloseDialog && mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    try {
+      await widget.connectionRepository.disconnect();
+    } catch (_) {
+      if (mounted && showError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text(AppLocalizations.of(context)!.common_error_message)),
+        );
+      }
     }
   }
 
@@ -381,13 +428,73 @@ class _InicioScreenState extends State<InicioScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => widget.connectionRepository.disconnect(),
+                onPressed: _cancelConnecting,
                 child: Text(l10n.home_connection_cancel_button),
               ),
             ],
           ),
         ),
       ).whenComplete(() => _qrDialogOpen = false),
+    );
+  }
+
+  void _showPhonePairingDialog(BuildContext context, AppLocalizations l10n) {
+    if (_phoneDialogOpen) return;
+    _phoneDialogOpen = true;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            backgroundColor: AppColors.surfaceCard,
+            title: Text(l10n.home_connection_connect_option_phone),
+            content: StreamBuilder<String?>(
+              stream: widget.connectionRepository.pairingCodeStream,
+              initialData: widget.connectionRepository.currentPairingCode,
+              builder: (context, snapshot) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (snapshot.data == null)
+                    const SizedBox(
+                      width: 180,
+                      height: 92,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else
+                    SelectableText(
+                      snapshot.data!,
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: AppColors.greenPrimary,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 4,
+                              ),
+                    ),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.home_connection_connecting_phone_description,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.home_connection_phone_dialog_instructions,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: _cancelConnecting,
+                child: Text(l10n.home_connection_cancel_button),
+              ),
+            ],
+          ),
+        ),
+      ).whenComplete(() => _phoneDialogOpen = false),
     );
   }
 
@@ -400,7 +507,10 @@ class _InicioScreenState extends State<InicioScreen> {
       children: [
         _ReactiveMascot(status: _status),
         const SizedBox(height: 24),
-        WalletSummaryCard(walletFuture: _walletFuture, l10n: l10n, onTap: _openWalletRecharge),
+        WalletSummaryCard(
+            walletFuture: _walletFuture,
+            l10n: l10n,
+            onTap: _openWalletRecharge),
         const SizedBox(height: 24),
         _ConnectionCard(
           status: _status,
@@ -411,7 +521,7 @@ class _InicioScreenState extends State<InicioScreen> {
           l10n: l10n,
           onManagePressed: () => _handleManageConnection(context),
           onConnectPressed: () => _handleConnectPressed(context),
-          onCancelConnecting: () => widget.connectionRepository.disconnect(),
+          onCancelConnecting: _cancelConnecting,
         ),
         const SizedBox(height: 24),
         _StatsCard(
@@ -552,8 +662,8 @@ class _ConnectionCard extends StatelessWidget {
               Text(
                 l10n.home_connection_session_name_label,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                      color: AppColors.textSecondary,
+                    ),
               ),
               Text(
                 session.sessionName,
@@ -573,9 +683,9 @@ class _ConnectionCard extends StatelessWidget {
                   Text(
                     l10n.home_connection_pairing_code_label(pairingCode!),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2,
+                        ),
                     textAlign: TextAlign.center,
                   ),
                 ] else if (qrCode != null) ...[
@@ -635,7 +745,8 @@ class _ConnectionCard extends StatelessWidget {
 /// cair de volta no ícone de placeholder em vez de quebrar a tela.
 Uint8List? _decodeQrCodeDataUrl(String qrCode) {
   final commaIndex = qrCode.indexOf(',');
-  final base64Part = commaIndex >= 0 ? qrCode.substring(commaIndex + 1) : qrCode;
+  final base64Part =
+      commaIndex >= 0 ? qrCode.substring(commaIndex + 1) : qrCode;
   try {
     return base64Decode(base64Part);
   } on FormatException {
@@ -855,9 +966,9 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final valueStyle = emphasize
         ? Theme.of(context).textTheme.headlineSmall?.copyWith(
-            color: AppColors.purplePrimary,
-            fontWeight: FontWeight.bold,
-          )
+              color: AppColors.purplePrimary,
+              fontWeight: FontWeight.bold,
+            )
         : Theme.of(context).textTheme.titleLarge;
 
     return Column(

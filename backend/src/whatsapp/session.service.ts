@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { Observable, Subject } from 'rxjs';
-import { Prisma, Session } from '@prisma/client';
+import { Prisma, Session, SessionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionConnectionUpdate, WhatsAppProvider } from './whatsapp-provider.interface';
 
@@ -23,6 +23,7 @@ export interface SessionEvent extends SessionConnectionUpdate {
 const HEARTBEAT_INTERVAL_MS = 15_000;
 /** 3x o intervalo — tolera um heartbeat perdido isolado sem trocar a sessão de dono cedo demais. */
 const HEARTBEAT_STALE_MS = 45_000;
+const RECOVERY_INTERVAL_MS = 30_000;
 
 /**
  * Orquestra o ciclo de vida da sessão WhatsApp de cada usuário (README §3/13):
@@ -50,7 +51,11 @@ const HEARTBEAT_STALE_MS = 45_000;
 export class SessionService implements OnModuleInit, OnModuleDestroy {
   private readonly workerId: string;
   private readonly sessionOwners = new Map<string, string>(); // sessionId -> userId
+  /** Último QR/código transitório por sessão deste worker; permite recuperar
+   * a tela quando o WebSocket reconecta depois de o evento original chegar. */
+  private readonly liveConnectionUpdates = new Map<string, SessionConnectionUpdate>();
   private heartbeatTimer?: NodeJS.Timeout;
+  private recoveryTimer?: NodeJS.Timeout;
   private readonly events = new Subject<SessionEvent>();
 
   /** Re-emissão dos eventos do provider, já filtrados para sessões deste worker — consumido pelo gateway WS (tarefa #17). */
@@ -84,10 +89,16 @@ export class SessionService implements OnModuleInit, OnModuleDestroy {
       void this.handleProviderUpdate(update);
     });
     this.heartbeatTimer = setInterval(() => void this.renewHeartbeats(), HEARTBEAT_INTERVAL_MS);
+    // Um redeploy não deve exigir que o usuário escaneie QR de novo. Depois
+    // que as credenciais já foram persistidas, retomamos sessões marcadas
+    // como conectadas assim que este worker puder reivindicá-las com segurança.
+    setTimeout(() => void this.recoverConnectedSessions(), 2_000);
+    this.recoveryTimer = setInterval(() => void this.recoverConnectedSessions(), RECOVERY_INTERVAL_MS);
   }
 
   onModuleDestroy(): void {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.recoveryTimer) clearInterval(this.recoveryTimer);
   }
 
   /** Busca a sessão do usuário, criando com os padrões do schema se ainda não existir (primeiro acesso). */
@@ -97,6 +108,18 @@ export class SessionService implements OnModuleInit, OnModuleDestroy {
       if (existing) return existing;
       return tx.session.create({ data: { userId } });
     });
+  }
+
+  async getSessionSnapshot(userId: string): Promise<Session & Pick<SessionConnectionUpdate, 'qr' | 'pairingCode'>> {
+    const session = await this.getOrCreateSession(userId);
+    const live = this.liveConnectionUpdates.get(session.id);
+    return {
+      ...session,
+      // Só expose valores de uma tentativa ainda em andamento; QR/código de
+      // uma sessão conectada ou encerrada jamais reaparece no app.
+      qr: session.status === 'CONECTANDO' ? live?.qr : undefined,
+      pairingCode: session.status === 'CONECTANDO' ? live?.pairingCode : undefined,
+    };
   }
 
   /** Equivalente a `ConnectionRepository.connect()` do front — inicia QR (sem `phoneNumber`) ou pareamento por código. */
@@ -214,6 +237,46 @@ export class SessionService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async recoverConnectedSessions(): Promise<void> {
+    try {
+      // User não possui RLS (por desenho; ver schema.prisma). Cada leitura de
+      // Session abaixo continua dentro de withTenantContext para preservar o
+      // isolamento das tabelas de sessão.
+      const users = await this.prisma.user.findMany({ select: { id: true } });
+      for (const { id: userId } of users) {
+        const session = await this.prisma.withTenantContext(userId, (tx) =>
+          tx.session.findUnique({ where: { userId } }),
+        );
+        if (!session || session.status !== SessionStatus.CONECTADA || this.sessionOwners.has(session.id)) {
+          continue;
+        }
+        const claimed = await this.claimSession(userId, session.id);
+        if (!claimed) continue;
+
+        this.sessionOwners.set(session.id, userId);
+        try {
+          await this.provider.startSession({ sessionId: session.id, userId });
+          this.logger.log(
+            { event: 'whatsapp_session_recovered', sessionId: session.id, userId },
+            'Sessão WhatsApp recuperada após inicialização/redeploy',
+          );
+        } catch (err) {
+          this.sessionOwners.delete(session.id);
+          await this.releaseClaim(userId, session.id);
+          this.logger.error(
+            { event: 'whatsapp_session_recovery_error', sessionId: session.id, userId, err },
+            'Falha ao recuperar sessão WhatsApp persistida; nova tentativa será feita automaticamente',
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.error(
+        { event: 'whatsapp_session_recovery_scan_error', err },
+        'Falha ao procurar sessões WhatsApp para recuperar; nova tentativa será feita automaticamente',
+      );
+    }
+  }
+
   /** Único consumidor de `provider.connectionUpdates$` — persiste no Postgres e re-emite para `events$` (gateway WS). */
   private async handleProviderUpdate(update: SessionConnectionUpdate): Promise<void> {
     const userId = this.sessionOwners.get(update.sessionId);
@@ -224,6 +287,8 @@ export class SessionService implements OnModuleInit, OnModuleDestroy {
       // deveria acontecer na prática, cada worker tem seu próprio provider).
       return;
     }
+
+    this.liveConnectionUpdates.set(update.sessionId, update);
 
     const data: Prisma.SessionUpdateInput = { status: update.status };
     if (update.phoneNumber) data.phoneNumber = update.phoneNumber;
@@ -241,6 +306,7 @@ export class SessionService implements OnModuleInit, OnModuleDestroy {
 
     if (update.loggedOut) {
       this.sessionOwners.delete(update.sessionId);
+      this.liveConnectionUpdates.delete(update.sessionId);
       await this.releaseClaim(userId, update.sessionId).catch((err) =>
         this.logger.error(
           { event: 'whatsapp_release_claim_error', sessionId: update.sessionId, userId, err },

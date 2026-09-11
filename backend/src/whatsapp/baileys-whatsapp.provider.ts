@@ -27,10 +27,13 @@ interface ActiveSocket {
   phoneNumber?: string;
   requiresPairing: boolean;
   pairingCodeRequested: boolean;
+  pairingCodeAttempts: number;
 }
 
 const BASE_RECONNECT_DELAY_MS = 1_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
+const PAIRING_CODE_RETRY_DELAY_MS = 2_500;
+const MAX_PAIRING_CODE_ATTEMPTS_PER_SOCKET = 3;
 
 /** Folga antes do limite da sessão sticky do DataImpulse — renova com essa antecedência, nunca em cima da hora (README raiz §4). */
 const STICKY_RENEWAL_BUFFER_MINUTES = 2;
@@ -76,6 +79,7 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
   private readonly reconnectAttempts = new Map<string, number>();
   private readonly reconnectTimers = new Map<string, NodeJS.Timeout>();
   private readonly stickyRenewalTimers = new Map<string, NodeJS.Timeout>();
+  private readonly pairingCodeRetryTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -88,20 +92,44 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
 
   async startSession({ sessionId, userId, phoneNumber }: StartSessionParams): Promise<void> {
     this.clearReconnectTimer(sessionId);
-    if (this.sockets.has(sessionId)) return; // já ativa — idempotente
+    const existing = this.sockets.get(sessionId);
+    if (existing) {
+      // Pedido repetido do mesmo fluxo é idempotente. Se o usuário trocou de
+      // QR para telefone (ou vice-versa), encerra apenas o socket pendente e
+      // cria um novo — nunca deixa o app preso ao fluxo anterior.
+      if (existing.phoneNumber === phoneNumber) return;
+      this.logger.warn(
+        { event: 'whatsapp_connection_flow_replaced', sessionId },
+        'Fluxo de conexão substituído pelo usuário; reiniciando socket pendente',
+      );
+      this.sockets.delete(sessionId);
+      existing.socket.end(undefined);
+    }
 
     const agents = await this.prepareProxyAgents(sessionId, userId, phoneNumber);
     if (agents === 'proxy_failed') return; // já logou, emitiu update e agendou retry — não abre socket sem proxy funcional
 
     const { state, saveCreds } = await useDbAuthState(this.prisma, this.sessionCrypto, sessionId, userId);
-    const { version } = await fetchLatestBaileysVersion();
+    let version: [number, number, number] | undefined;
+    try {
+      ({ version } = await fetchLatestBaileysVersion());
+    } catch (err) {
+      // A consulta de versão é uma otimização, não pode impedir QR ou código
+      // quando o endpoint externo estiver oscilando.
+      this.logger.warn(
+        { event: 'whatsapp_baileys_version_fetch_error', sessionId, err },
+        'Não foi possível obter a versão mais recente do Baileys; usando a versão padrão da biblioteca',
+      );
+    }
 
     const socket = makeWASocket({
-      version,
+      ...(version ? { version } : {}),
       auth: state,
       browser: Browsers.ubuntu('ZaBot'),
       printQRInTerminal: false,
       syncFullHistory: false,
+      connectTimeoutMs: 60_000,
+      keepAliveIntervalMs: 20_000,
       logger: silentBaileysLogger(),
       ...(agents ? { agent: agents.agent, fetchAgent: agents.fetchAgent } : {}),
     });
@@ -112,6 +140,7 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
       phoneNumber,
       requiresPairing: Boolean(phoneNumber && !state.creds.registered),
       pairingCodeRequested: false,
+      pairingCodeAttempts: 0,
     });
     if (agents) this.scheduleStickyRenewal(sessionId, userId, phoneNumber);
     socket.ev.on('creds.update', saveCreds);
@@ -127,6 +156,7 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
   async stopSession(sessionId: string): Promise<void> {
     this.clearReconnectTimer(sessionId);
     this.clearStickyRenewalTimer(sessionId);
+    this.clearPairingCodeRetryTimer(sessionId);
     this.reconnectAttempts.delete(sessionId);
 
     const active = this.sockets.get(sessionId);
@@ -245,6 +275,7 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
   onModuleDestroy(): void {
     for (const timer of this.reconnectTimers.values()) clearTimeout(timer);
     for (const timer of this.stickyRenewalTimers.values()) clearTimeout(timer);
+    for (const timer of this.pairingCodeRetryTimers.values()) clearTimeout(timer);
     for (const { socket } of this.sockets.values()) socket.end(undefined);
   }
 
@@ -259,6 +290,16 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
     if (this.sockets.get(sessionId)?.socket !== socket) return;
 
     const { connection, lastDisconnect, qr } = update;
+    this.logger.debug(
+      {
+        event: 'whatsapp_connection_update',
+        sessionId,
+        connection,
+        hasQr: Boolean(qr),
+        hasLastDisconnect: Boolean(lastDisconnect),
+      },
+      'Atualização de conexão recebida do WhatsApp',
+    );
 
     // Algumas versões do protocolo entregam só o update com `qr`, sem um
     // update separado de `connection: connecting`. Para pareamento por
@@ -278,6 +319,7 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
     }
 
     if (connection === 'open') {
+      this.clearPairingCodeRetryTimer(sessionId);
       this.reconnectAttempts.delete(sessionId);
       const waNumber = socket.user?.id?.split(':')[0]?.split('@')[0];
       this.updates.next({ sessionId, status: 'CONECTADA', phoneNumber: waNumber });
@@ -308,6 +350,7 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
 
       this.sockets.delete(sessionId);
       this.clearStickyRenewalTimer(sessionId);
+      this.clearPairingCodeRetryTimer(sessionId);
 
       if (definitive) {
         await clearAuthState(this.prisma, sessionId, userId);
@@ -366,7 +409,8 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
       active.socket !== socket ||
       !active.phoneNumber ||
       !active.requiresPairing ||
-      active.pairingCodeRequested
+      active.pairingCodeRequested ||
+      this.pairingCodeRetryTimers.has(sessionId)
     ) {
       return;
     }
@@ -375,15 +419,47 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
     try {
       const digitsOnly = active.phoneNumber.replace(/\D/g, '');
       const code = await socket.requestPairingCode(digitsOnly);
+      active.pairingCodeAttempts = 0;
+      this.clearPairingCodeRetryTimer(sessionId);
       this.updates.next({ sessionId, status: 'CONECTANDO', pairingCode: code });
     } catch (err) {
       // Permite uma nova solicitação se o Baileys emitir outro `connecting`
       // após um restart transitório do handshake.
       active.pairingCodeRequested = false;
       this.logger.error(
-        { event: 'whatsapp_pairing_code_error', sessionId, err },
+        {
+          event: 'whatsapp_pairing_code_error',
+          sessionId,
+          attempt: active.pairingCodeAttempts + 1,
+          phoneSuffix: digitsOnly.slice(-4),
+          err,
+        },
         'Falha ao solicitar código de pareamento ao WhatsApp',
       );
+      active.pairingCodeAttempts += 1;
+      this.updates.next({
+        sessionId,
+        status: 'CONECTANDO',
+        disconnectReason: 'falha_ao_gerar_codigo_pareamento_tentando_novamente',
+      });
+      if (active.pairingCodeAttempts < MAX_PAIRING_CODE_ATTEMPTS_PER_SOCKET) {
+        const timer = setTimeout(() => {
+          this.pairingCodeRetryTimers.delete(sessionId);
+          void this.requestPairingCodeWhenReady(sessionId, socket);
+        }, PAIRING_CODE_RETRY_DELAY_MS * active.pairingCodeAttempts);
+        this.pairingCodeRetryTimers.set(sessionId, timer);
+      } else {
+        // O socket pode ter ficado num estado parcial depois de uma falha do
+        // protocolo. Fechá-lo aciona o reconector normal com socket novo.
+        this.logger.warn(
+          { event: 'whatsapp_pairing_code_socket_restart', sessionId },
+          'Código de pareamento falhou repetidamente; reiniciando socket',
+        );
+        this.sockets.delete(sessionId);
+        this.clearPairingCodeRetryTimer(sessionId);
+        this.scheduleReconnect(sessionId, active.userId, active.phoneNumber);
+        socket.end(undefined);
+      }
     }
   }
 
@@ -392,6 +468,14 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
     if (timer) {
       clearTimeout(timer);
       this.reconnectTimers.delete(sessionId);
+    }
+  }
+
+  private clearPairingCodeRetryTimer(sessionId: string): void {
+    const timer = this.pairingCodeRetryTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.pairingCodeRetryTimers.delete(sessionId);
     }
   }
 

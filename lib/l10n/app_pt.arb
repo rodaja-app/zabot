@@ -383,6 +383,18 @@
   "@messages_contacts_import_button": {
     "description": "Botão para importar novos contatos"
   },
+  "messages_contacts_directory_button": "Contatos importados",
+  "@messages_contacts_directory_button": {
+    "description": "Botão que abre o modal de contatos importados na aba Campanhas"
+  },
+  "messages_contacts_directory_title": "Contatos importados",
+  "@messages_contacts_directory_title": {
+    "description": "Título do modal que lista os contatos importados"
+  },
+  "messages_contacts_directory_description": "Pesquise, edite ou remova um contato antes de iniciar uma campanha.",
+  "@messages_contacts_directory_description": {
+    "description": "Explicação exibida no modal de contatos importados"
+  },
   "messages_contacts_search_hint": "Buscar contato",
   "@messages_contacts_search_hint": {
     "description": "Rótulo do campo de busca de contatos"
@@ -516,6 +528,30 @@
   "messages_nova_campanha_personalization_empty": "Nenhum dado de personalização disponível nos contatos importados.",
   "@messages_nova_campanha_personalization_empty": {
     "description": "Texto exibido quando nenhum contato tem campos de personalização (ID1, ID2...)"
+  },
+  "messages_nova_campanha_personalization_guide_title": "Faça cada mensagem parecer pessoal",
+  "@messages_nova_campanha_personalization_guide_title": {
+    "description": "Título do guia de personalização exibido sem campos ID disponíveis"
+  },
+  "messages_nova_campanha_personalization_guide_description": "Use {ID1} para trocar o marcador pelo dado salvo em cada contato, como o nome.",
+  "@messages_nova_campanha_personalization_guide_description": {
+    "description": "Explicação de como o marcador ID é substituído na mensagem"
+  },
+  "messages_nova_campanha_personalization_guide_step_one": "Ao importar um contato, salve o nome no campo ID1.",
+  "@messages_nova_campanha_personalization_guide_step_one": {
+    "description": "Primeiro passo para configurar personalização"
+  },
+  "messages_nova_campanha_personalization_guide_step_two": "Depois, toque em {ID1} aqui para inserir o nome na sua mensagem.",
+  "@messages_nova_campanha_personalization_guide_step_two": {
+    "description": "Segundo passo para usar personalização"
+  },
+  "messages_nova_campanha_personalization_guide_example_label": "EXEMPLO DE MENSAGEM",
+  "@messages_nova_campanha_personalization_guide_example_label": {
+    "description": "Rótulo acima do exemplo de mensagem personalizada"
+  },
+  "messages_nova_campanha_personalization_guide_example": "Contato salvo: Ana no ID1\nMensagem: Olá, {ID1}! Temos uma novidade para você.",
+  "@messages_nova_campanha_personalization_guide_example": {
+    "description": "Exemplo completo de um contato e uma mensagem com marcador ID1"
   },
   "messages_nova_campanha_personalization_hint": "Toque em um dos campos abaixo para inserir na mensagem selecionada.",
   "@messages_nova_campanha_personalization_hint": {

@@ -610,6 +610,24 @@ abstract class AppLocalizations {
   /// **'Importar contatos'**
   String get messages_contacts_import_button;
 
+  /// Botão que abre o modal de contatos importados na aba Campanhas
+  ///
+  /// In pt, this message translates to:
+  /// **'Contatos importados'**
+  String get messages_contacts_directory_button;
+
+  /// Título do modal que lista os contatos importados
+  ///
+  /// In pt, this message translates to:
+  /// **'Contatos importados'**
+  String get messages_contacts_directory_title;
+
+  /// Explicação exibida no modal de contatos importados
+  ///
+  /// In pt, this message translates to:
+  /// **'Pesquise, edite ou remova um contato antes de iniciar uma campanha.'**
+  String get messages_contacts_directory_description;
+
   /// Rótulo do campo de busca de contatos
   ///
   /// In pt, this message translates to:
@@ -784,6 +802,42 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Nenhum dado de personalização disponível nos contatos importados.'**
   String get messages_nova_campanha_personalization_empty;
+
+  /// Título do guia de personalização exibido sem campos ID disponíveis
+  ///
+  /// In pt, this message translates to:
+  /// **'Faça cada mensagem parecer pessoal'**
+  String get messages_nova_campanha_personalization_guide_title;
+
+  /// Explicação de como o marcador ID é substituído na mensagem
+  ///
+  /// In pt, this message translates to:
+  /// **'Use {ID1} para trocar o marcador pelo dado salvo em cada contato, como o nome.'**
+  String get messages_nova_campanha_personalization_guide_description;
+
+  /// Primeiro passo para configurar personalização
+  ///
+  /// In pt, this message translates to:
+  /// **'Ao importar um contato, salve o nome no campo ID1.'**
+  String get messages_nova_campanha_personalization_guide_step_one;
+
+  /// Segundo passo para usar personalização
+  ///
+  /// In pt, this message translates to:
+  /// **'Depois, toque em {ID1} aqui para inserir o nome na sua mensagem.'**
+  String get messages_nova_campanha_personalization_guide_step_two;
+
+  /// Rótulo acima do exemplo de mensagem personalizada
+  ///
+  /// In pt, this message translates to:
+  /// **'EXEMPLO DE MENSAGEM'**
+  String get messages_nova_campanha_personalization_guide_example_label;
+
+  /// Exemplo completo de um contato e uma mensagem com marcador ID1
+  ///
+  /// In pt, this message translates to:
+  /// **'Contato salvo: Ana no ID1\\nMensagem: Olá, {ID1}! Temos uma novidade para você.'**
+  String get messages_nova_campanha_personalization_guide_example;
 
   /// Texto explicando como usar os chips de personalização
   ///

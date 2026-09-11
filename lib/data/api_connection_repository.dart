@@ -31,7 +31,8 @@ class ApiConnectionRepository implements ConnectionRepository {
   final RealtimeClient _realtimeClient;
 
   ZapConnectionStatus _status = ZapConnectionStatus.disconnected;
-  ZapSessionInfo _session = const ZapSessionInfo(sessionName: '', phoneNumber: '');
+  ZapSessionInfo _session =
+      const ZapSessionInfo(sessionName: '', phoneNumber: '');
   String? _qrCode;
   String? _pairingCode;
   bool _listenersRegistered = false;
@@ -40,9 +41,12 @@ class ApiConnectionRepository implements ConnectionRepository {
       StreamController<ZapConnectionStatus>.broadcast();
   final StreamController<ZapSessionInfo> _sessionController =
       StreamController<ZapSessionInfo>.broadcast();
-  final StreamController<String?> _qrCodeController = StreamController<String?>.broadcast();
-  final StreamController<String?> _pairingCodeController = StreamController<String?>.broadcast();
-  final StreamController<HomeStats> _statsController = StreamController<HomeStats>.broadcast();
+  final StreamController<String?> _qrCodeController =
+      StreamController<String?>.broadcast();
+  final StreamController<String?> _pairingCodeController =
+      StreamController<String?>.broadcast();
+  final StreamController<HomeStats> _statsController =
+      StreamController<HomeStats>.broadcast();
 
   @override
   Stream<ZapConnectionStatus> get statusStream => _statusController.stream;
@@ -80,7 +84,8 @@ class ApiConnectionRepository implements ConnectionRepository {
     await _realtimeClient.ensureConnected();
     _registerRealtimeListeners();
     try {
-      final body = await _apiClient.get('/whatsapp/session') as Map<String, dynamic>;
+      final body =
+          await _apiClient.get('/whatsapp/session') as Map<String, dynamic>;
       _applySessionSnapshot(body);
     } on Exception {
       // Sem sessão criada ainda (usuário nunca conectou) ou falha de rede no
@@ -141,7 +146,8 @@ class ApiConnectionRepository implements ConnectionRepository {
       // ausência desses campos em `null`, pois isso apagava o QR/código
       // ainda válido da tela antes de o usuário conseguir usá-lo.
       if (data.containsKey('qr')) _qrCode = data['qr'] as String?;
-      if (data.containsKey('pairingCode')) _pairingCode = data['pairingCode'] as String?;
+      if (data.containsKey('pairingCode'))
+        _pairingCode = data['pairingCode'] as String?;
     }
     _qrCodeController.add(_qrCode);
     _pairingCodeController.add(_pairingCode);
@@ -176,20 +182,43 @@ class ApiConnectionRepository implements ConnectionRepository {
   Future<void> connect({String? phoneNumber}) async {
     await _realtimeClient.ensureConnected();
     _registerRealtimeListeners();
+    // Não dependemos exclusivamente do primeiro evento WS para dar retorno
+    // visual. Se ele atrasar, o modal já abre em estado de conexão e nunca
+    // parece travado; QR/código reais continuam chegando pelo socket.
+    _status = ZapConnectionStatus.connecting;
+    _qrCode = null;
+    _pairingCode = null;
+    _statusController.add(_status);
+    _qrCodeController.add(null);
+    _pairingCodeController.add(null);
     // 202 fire-and-forget (SessionController.connect) — o backend não
     // devolve o novo status na resposta. O estado real (CONECTANDO, depois o
     // QR code/código de pareamento, depois CONECTADA) chega pelo evento
     // `session` do WebSocket registrado acima; não há nada para aplicar aqui.
-    await _apiClient.post('/whatsapp/session/connect', body: {
-      if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
-        'phoneNumber': phoneNumber.trim(),
-    });
+    try {
+      await _apiClient.post('/whatsapp/session/connect', body: {
+        if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
+          'phoneNumber': phoneNumber.trim(),
+      });
+    } catch (_) {
+      _status = ZapConnectionStatus.disconnected;
+      _statusController.add(_status);
+      rethrow;
+    }
   }
 
   @override
   Future<void> disconnect() async {
     // Mesmo raciocínio de connect(): 204 sem corpo, o status DESCONECTADA
     // "de verdade" chega pelo WebSocket.
+    // Atualização otimista: cancelar não pode depender de uma resposta WS
+    // tardia para fechar um modal de QR/pareamento.
+    _status = ZapConnectionStatus.disconnected;
+    _qrCode = null;
+    _pairingCode = null;
+    _statusController.add(_status);
+    _qrCodeController.add(null);
+    _pairingCodeController.add(null);
     await _apiClient.post('/whatsapp/session/disconnect');
   }
 
@@ -200,13 +229,15 @@ class ApiConnectionRepository implements ConnectionRepository {
     final body = await _apiClient.patch('/whatsapp/session/name', body: {
       'name': trimmed,
     }) as Map<String, dynamic>;
-    _session = _session.copyWith(sessionName: (body['name'] as String?) ?? trimmed);
+    _session =
+        _session.copyWith(sessionName: (body['name'] as String?) ?? trimmed);
     _sessionController.add(_session);
   }
 
   @override
   Future<HomeStats> getStats() async {
-    final body = await _apiClient.get('/whatsapp/session/stats') as Map<String, dynamic>;
+    final body =
+        await _apiClient.get('/whatsapp/session/stats') as Map<String, dynamic>;
     return _statsFromJson(body);
   }
 
