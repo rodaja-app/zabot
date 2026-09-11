@@ -190,12 +190,6 @@ abstract class AppLocalizations {
   /// **'Cadastrar'**
   String get auth_cadastro_submit_button;
 
-  /// Link no Cadastro que leva à tela de Login
-  ///
-  /// In pt, this message translates to:
-  /// **'Já tem uma conta? Entrar'**
-  String get auth_cadastro_login_link;
-
   /// Erro exibido quando o backend responde 409 (email já cadastrado) no Cadastro
   ///
   /// In pt, this message translates to:
@@ -207,6 +201,12 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.'**
   String get auth_cadastro_network_error;
+
+  /// Link no Cadastro que leva à tela de Login
+  ///
+  /// In pt, this message translates to:
+  /// **'Já tem uma conta? Entrar'**
+  String get auth_cadastro_login_link;
 
   /// Título da tela de Confirmação de código
   ///
@@ -433,13 +433,13 @@ abstract class AppLocalizations {
   /// Rótulo do campo de texto do diálogo de conectar por número de telefone
   ///
   /// In pt, this message translates to:
-  /// **'Número de telefone'**
+  /// **'Número internacional (DDI + número)'**
   String get home_connection_phone_dialog_label;
 
   /// Instruções exibidas no diálogo de conectar por número de telefone
   ///
   /// In pt, this message translates to:
-  /// **'Você vai receber um código no WhatsApp desse número para confirmar a conexão.'**
+  /// **'Informe o número internacional completo em formato E.164: DDI + código de área + número, apenas dígitos (ex.: 14155552671). O código de pareamento aparecerá aqui no ZaBot.'**
   String get home_connection_phone_dialog_instructions;
 
   /// Título do card de resumo/estatísticas na Tela Início
@@ -851,6 +851,18 @@ abstract class AppLocalizations {
   /// **'Não foi possível selecionar o arquivo. Tente novamente.'**
   String get messages_nova_campanha_media_pick_error;
 
+  /// Aviso exibido quando o usuário tenta iniciar uma campanha sem uma sessão WhatsApp conectada
+  ///
+  /// In pt, this message translates to:
+  /// **'Conecte seu WhatsApp na tela Início antes de iniciar uma campanha.'**
+  String get messages_nova_campanha_whatsapp_required;
+
+  /// Aviso exibido antes de abrir a recarga quando o saldo não cobre todos os envios
+  ///
+  /// In pt, this message translates to:
+  /// **'Você não tem créditos suficientes para esta campanha. Vamos abrir a recarga.'**
+  String get messages_nova_campanha_balance_required;
+
   /// Título da seção de intervalo aleatório entre envios
   ///
   /// In pt, this message translates to:
@@ -988,6 +1000,13 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Escolha um pacote'**
   String get wallet_packages_section_title;
+
+  String get wallet_custom_amount_title;
+  String get wallet_custom_amount_description;
+  String get wallet_custom_amount_label;
+  String get wallet_custom_amount_continue;
+  String get wallet_credits_explanation;
+  String get wallet_bonus_explanation;
 
   /// Quantidade de créditos de um pacote de recarga
   ///

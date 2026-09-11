@@ -31,7 +31,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>O ZaBot usa a câmera para você escanear o QR code e conectar sua sessão do WhatsApp.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>O ZaBot acessa suas fotos para você anexar imagens nas mensagens e campanhas.</string>
+	<string>O ZaBot acessa sua galeria somente quando você escolhe imagens para anexar em mensagens e campanhas.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

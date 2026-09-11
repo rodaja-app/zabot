@@ -260,7 +260,11 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
 
     const { connection, lastDisconnect, qr } = update;
 
-    if (connection === 'connecting') {
+    // Algumas versões do protocolo entregam só o update com `qr`, sem um
+    // update separado de `connection: connecting`. Para pareamento por
+    // telefone, ambos significam que o socket já está pronto para solicitar
+    // o código; limitar ao primeiro deixava o fluxo silencioso.
+    if (connection === 'connecting' || qr) {
       await this.requestPairingCodeWhenReady(sessionId, socket);
     }
 

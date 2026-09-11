@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
 
 import '../../data/contact_repository.dart';
+import '../../data/connection_repository.dart';
 import '../../data/message_repository.dart';
+import '../../data/wallet_repository.dart';
 import '../../data/models/campaign.dart';
 import '../../data/models/campaign_media_type.dart';
 import '../../data/models/contact.dart';
@@ -30,10 +32,14 @@ class MensagensScreen extends StatefulWidget {
     super.key,
     required this.messageRepository,
     required this.contactRepository,
+    required this.connectionRepository,
+    required this.walletRepository,
   });
 
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
+  final ConnectionRepository connectionRepository;
+  final WalletRepository walletRepository;
 
   @override
   State<MensagensScreen> createState() => _MensagensScreenState();
@@ -74,9 +80,20 @@ class _MensagensScreenState extends State<MensagensScreen>
         ),
         TabBar(
           controller: _tabController,
+          labelColor: AppColors.greenPrimary,
+          unselectedLabelColor: AppColors.textSecondary,
+          indicatorColor: AppColors.greenPrimary,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700),
           tabs: [
-            Tab(text: l10n.messages_tab_campaigns),
-            Tab(text: l10n.messages_tab_contacts),
+            Tab(
+              icon: const Icon(Icons.campaign_outlined),
+              text: l10n.messages_tab_campaigns,
+            ),
+            Tab(
+              icon: const Icon(Icons.people_outline_rounded),
+              text: l10n.messages_tab_contacts,
+            ),
           ],
         ),
         Expanded(
@@ -90,6 +107,8 @@ class _MensagensScreenState extends State<MensagensScreen>
               _CampaignsTab(
                 messageRepository: widget.messageRepository,
                 contactRepository: widget.contactRepository,
+                connectionRepository: widget.connectionRepository,
+                walletRepository: widget.walletRepository,
               ),
               _ContactsTab(contactRepository: widget.contactRepository),
             ],
@@ -104,10 +123,14 @@ class _CampaignsTab extends StatefulWidget {
   const _CampaignsTab({
     required this.messageRepository,
     required this.contactRepository,
+    required this.connectionRepository,
+    required this.walletRepository,
   });
 
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
+  final ConnectionRepository connectionRepository;
+  final WalletRepository walletRepository;
 
   @override
   State<_CampaignsTab> createState() => _CampaignsTabState();
@@ -141,6 +164,8 @@ class _CampaignsTabState extends State<_CampaignsTab> {
         builder: (_) => NovaCampanhaScreen(
           messageRepository: widget.messageRepository,
           contactRepository: widget.contactRepository,
+          connectionRepository: widget.connectionRepository,
+          walletRepository: widget.walletRepository,
         ),
       ),
     );

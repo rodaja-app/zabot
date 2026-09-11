@@ -33,6 +33,10 @@ export class WalletService {
   ) {}
 
   async getWallet(userId: string): Promise<WalletDto> {
+    // Recupera pagamentos aprovados cujo webhook atrasou/perdeu. Assim, até
+    // uma tela já aberta numa versão anterior do app volta a atualizar pelo
+    // polling de saldo que ela já faz.
+    await this.syncPendingRecharges(userId);
     const wallet = await this.prisma.withTenantContext(userId, (tx) => tx.wallet.findUnique({ where: { userId } }));
     return toWalletDto(wallet);
   }
@@ -88,6 +92,55 @@ export class WalletService {
       return this.createCardRecharge(userId, pending.id, pkg, user.email, dto);
     }
     return this.createPixRecharge(userId, pending.id, pkg, user.email);
+  }
+
+  /** Confirma uma recarga pendente sem depender da entrega do webhook. */
+  async syncRechargeStatus(userId: string, transactionId: string): Promise<RechargeResultDto> {
+    const transaction = await this.prisma.withTenantContext(userId, (tx) =>
+      tx.walletTransaction.findUnique({ where: { id: transactionId } }),
+    );
+    if (!transaction || transaction.type !== WalletTransactionType.RECARGA) {
+      throw new BadRequestException('Recarga não encontrada.');
+    }
+    if (transaction.status !== WalletTransactionStatus.PENDENTE || !transaction.pixPaymentId) {
+      return toRechargeResultDto(transaction);
+    }
+
+    const payment = await this.mercadoPago.getPayment(transaction.pixPaymentId);
+    const expectedReference = `${userId}${EXTERNAL_REFERENCE_SEPARATOR}${transactionId}`;
+    if (payment.externalReference !== expectedReference) {
+      this.logger.error(
+        { event: 'mercadopago_recharge_reference_mismatch', transactionId, paymentId: payment.id },
+        'Pagamento Mercado Pago não corresponde à recarga solicitada',
+      );
+      throw new PixPaymentError('Não foi possível confirmar esta recarga.', { transactionId, paymentId: payment.id });
+    }
+
+    return this.prisma.withTenantContext(userId, async (tx) => {
+      await this.applyPaymentUpdate(tx, transactionId, payment);
+      return toRechargeResultDto(await tx.walletTransaction.findUniqueOrThrow({ where: { id: transactionId } }));
+    });
+  }
+
+  private async syncPendingRecharges(userId: string): Promise<void> {
+    const pending = await this.prisma.withTenantContext(userId, (tx) =>
+      tx.walletTransaction.findMany({
+        where: {
+          type: WalletTransactionType.RECARGA,
+          status: WalletTransactionStatus.PENDENTE,
+          pixPaymentId: { not: null },
+        },
+        select: { id: true },
+      }),
+    );
+    for (const transaction of pending) {
+      await this.syncRechargeStatus(userId, transaction.id).catch((err) =>
+        this.logger.warn(
+          { event: 'mercadopago_pending_recharge_sync_failed', transactionId: transaction.id, err },
+          'Não foi possível sincronizar recarga Pix pendente agora',
+        ),
+      );
+    }
   }
 
   private async createPixRecharge(

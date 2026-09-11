@@ -1,16 +1,23 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../data/api/api_exception.dart';
 import '../../data/contact_repository.dart';
+import '../../data/connection_repository.dart';
 import '../../data/message_repository.dart';
 import '../../data/models/campaign_media_type.dart';
 import '../../data/models/contact.dart';
 import '../../data/models/picked_media.dart';
+import '../../data/models/zap_connection_status.dart';
+import '../../data/wallet_repository.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/app_page_route.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/state_views.dart';
+import '../wallet/wallet_recharge_screen.dart';
 
 /// Tela de criação de campanha (Etapa 5, README.md seção 13; Menu 2 —
 /// Mensagens, seções "Criar mensagem", "Personalização", "Mídia" e
@@ -25,10 +32,14 @@ class NovaCampanhaScreen extends StatefulWidget {
     super.key,
     required this.messageRepository,
     required this.contactRepository,
+    required this.connectionRepository,
+    required this.walletRepository,
   });
 
   final MessageRepository messageRepository;
   final ContactRepository contactRepository;
+  final ConnectionRepository connectionRepository;
+  final WalletRepository walletRepository;
 
   @override
   State<NovaCampanhaScreen> createState() => _NovaCampanhaScreenState();
@@ -57,6 +68,7 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
   /// [_mediaType] como seleção só visual). Vazio enquanto nenhum arquivo
   /// foi escolhido, mesmo que [_mediaType] já esteja marcado.
   List<PickedMedia> _mediaFiles = [];
+  final ImagePicker _imagePicker = ImagePicker();
 
   /// Limites do intervalo aleatório entre um envio e outro (Menu 2, seção
   /// "Intervalo de envio"). Só a interface é implementada por enquanto —
@@ -200,10 +212,16 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
     _insertText(emoji);
   }
 
-  /// Abre o seletor de arquivos nativo para [type] (toque no chip de mídia,
-  /// ou no botão "Selecionar/Trocar arquivo"). Cancelar o seletor não muda
-  /// nada — só um arquivo escolhido de verdade marca [_mediaType].
+  /// Abre a galeria nativa para imagens e o seletor de arquivos para áudio e
+  /// documentos. Cancelar não muda nada — só mídia escolhida de verdade marca
+  /// [_mediaType]. No iOS, a galeria mostra a permissão/sistema de seleção
+  /// apropriado; a justificativa está em `NSPhotoLibraryUsageDescription`.
   Future<void> _pickMedia(CampaignMediaType type) async {
+    if (type == CampaignMediaType.images) {
+      await _pickImagesFromGallery();
+      return;
+    }
+
     FilePickerResult? result;
     try {
       result = await FilePicker.platform.pickFiles(
@@ -211,11 +229,10 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
             ? FileType.any
             : FileType.custom,
         allowedExtensions: switch (type) {
-          CampaignMediaType.images => _imageExtensions,
           CampaignMediaType.audio => _audioExtensions,
-          CampaignMediaType.document || CampaignMediaType.none => null,
+          CampaignMediaType.images || CampaignMediaType.document || CampaignMediaType.none => null,
         },
-        allowMultiple: type == CampaignMediaType.images,
+        allowMultiple: false,
         withData: true,
       );
     } catch (_) {
@@ -233,7 +250,7 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
 
     final picked = result.files
         .where((file) => file.bytes != null)
-        .take(type == CampaignMediaType.images ? _maxImageFiles : 1)
+        .take(1)
         .map(
           (file) => PickedMedia(
             bytes: file.bytes!,
@@ -248,6 +265,40 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
       _mediaType = type;
       _mediaFiles = picked;
     });
+  }
+
+  Future<void> _pickImagesFromGallery() async {
+    try {
+      final images = await _imagePicker.pickMultiImage();
+      if (images.isEmpty || !mounted) return;
+
+      final picked = <PickedMedia>[];
+      for (final image in images.take(_maxImageFiles)) {
+        final bytes = await image.readAsBytes();
+        picked.add(
+          PickedMedia(
+            bytes: bytes,
+            mimeType: _guessMimeType(_extensionFromFileName(image.name)),
+            fileName: image.name,
+          ),
+        );
+      }
+      if (!mounted || picked.isEmpty) return;
+      setState(() {
+        _mediaType = CampaignMediaType.images;
+        _mediaFiles = picked;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.messages_nova_campanha_media_pick_error)),
+      );
+    }
+  }
+
+  String? _extensionFromFileName(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    return dot < 0 ? null : fileName.substring(dot + 1);
   }
 
   void _clearMedia() {
@@ -355,19 +406,88 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
 
   Future<void> _handleSubmit() async {
     if (!_canSubmit) return;
+    // O botão continua visível e o fluxo fica claro mesmo quando a pessoa
+    // acaba de terminar de digitar a última mensagem.
+    FocusManager.instance.primaryFocus?.unfocus();
+    final l10n = AppLocalizations.of(context)!;
+
+    // Não cria uma campanha (nem atualiza o histórico) antes de existir uma
+    // sessão pronta para enviá-la. A orientação é só informativa: a pessoa
+    // continua nesta tela e conecta o WhatsApp quando desejar, pela Início.
+    if (widget.connectionRepository.currentStatus !=
+        ZapConnectionStatus.connected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.messages_nova_campanha_whatsapp_required)),
+      );
+      return;
+    }
+
+    final requiredCredits = _recipientCount * _nonEmptyMessages.length;
+    try {
+      final wallet = await widget.walletRepository.getBalance();
+      if (!mounted) return;
+      if (wallet.balance < requiredCredits) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.messages_nova_campanha_balance_required)),
+        );
+        await Navigator.of(context).push(
+          AppPageRoute(
+            builder: (_) => WalletRechargeScreen(
+              walletRepository: widget.walletRepository,
+            ),
+          ),
+        );
+        return;
+      }
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.common_error_message)),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
+    try {
+      await widget.messageRepository.createCampaign(
+        messages: _nonEmptyMessages,
+        recipientCount: _recipientCount,
+        mediaType: _mediaType,
+        mediaCount: _mediaFiles.length,
+        media: _mediaFiles,
+        recipientIds: _sendToAll ? null : _selectedContactIds,
+      );
 
-    await widget.messageRepository.createCampaign(
-      messages: _nonEmptyMessages,
-      recipientCount: _recipientCount,
-      mediaType: _mediaType,
-      mediaCount: _mediaFiles.length,
-      media: _mediaFiles,
-      recipientIds: _sendToAll ? null : _selectedContactIds,
-    );
-
-    if (!mounted) return;
-    Navigator.of(context).pop();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      if (error.isPaymentRejected) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.messages_nova_campanha_balance_required)),
+        );
+        await Navigator.of(context).push(
+          AppPageRoute(
+            builder: (_) => WalletRechargeScreen(
+              walletRepository: widget.walletRepository,
+            ),
+          ),
+        );
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.common_error_message)),
+      );
+    }
   }
 
   @override
@@ -381,9 +501,10 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            Text(
-              l10n.messages_nova_campanha_messages_section_title,
-              style: Theme.of(context).textTheme.titleMedium,
+            _CampaignSectionTitle(
+              icon: Icons.chat_bubble_rounded,
+              title: l10n.messages_nova_campanha_messages_section_title,
+              trailing: '${_messageControllers.length}/$_maxMessages',
             ),
             const SizedBox(height: 4),
             Text(
@@ -396,6 +517,7 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
                 label: l10n.messages_nova_campanha_message_field_label(i + 1),
                 controller: _messageControllers[i],
                 focusNode: _messageFocusNodes[i],
+                isFocused: _focusedMessageIndex == i,
                 canRemove: _messageControllers.length > 1,
                 onRemove: () => _removeMessage(i),
                 onBold: () {
@@ -430,9 +552,10 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
                 ),
               ),
             const SizedBox(height: 24),
-            Text(
-              l10n.messages_nova_campanha_personalization_section_title,
-              style: Theme.of(context).textTheme.titleMedium,
+            _CampaignSectionTitle(
+              icon: Icons.auto_awesome_rounded,
+              title: l10n.messages_nova_campanha_personalization_section_title,
+              greenAccent: true,
             ),
             const SizedBox(height: 8),
             if (_isLoadingContacts)
@@ -466,9 +589,9 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
               ),
             ],
             const SizedBox(height: 24),
-            Text(
-              l10n.messages_nova_campanha_media_section_title,
-              style: Theme.of(context).textTheme.titleMedium,
+            _CampaignSectionTitle(
+              icon: Icons.perm_media_rounded,
+              title: l10n.messages_nova_campanha_media_section_title,
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -563,9 +686,10 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
               ),
             ],
             const SizedBox(height: 24),
-            Text(
-              l10n.messages_nova_campanha_interval_section_title,
-              style: Theme.of(context).textTheme.titleMedium,
+            _CampaignSectionTitle(
+              icon: Icons.timer_outlined,
+              title: l10n.messages_nova_campanha_interval_section_title,
+              greenAccent: true,
             ),
             const SizedBox(height: 4),
             Text(
@@ -601,9 +725,9 @@ class _NovaCampanhaScreenState extends State<NovaCampanhaScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            Text(
-              l10n.messages_nova_campanha_send_section_title,
-              style: Theme.of(context).textTheme.titleMedium,
+            _CampaignSectionTitle(
+              icon: Icons.rocket_launch_rounded,
+              title: l10n.messages_nova_campanha_send_section_title,
             ),
             const SizedBox(height: 8),
             if (_isLoadingContacts)
@@ -697,6 +821,7 @@ class _MessageComposerField extends StatelessWidget {
     required this.label,
     required this.controller,
     required this.focusNode,
+    required this.isFocused,
     required this.canRemove,
     required this.onRemove,
     required this.onBold,
@@ -711,6 +836,7 @@ class _MessageComposerField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final FocusNode focusNode;
+  final bool isFocused;
   final bool canRemove;
   final VoidCallback onRemove;
   final VoidCallback onBold;
@@ -723,14 +849,40 @@ class _MessageComposerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderDivider),
-      ),
-      child: Column(
+    // `onPointerDown` recebe o toque em qualquer espaço do card, inclusive
+    // ao lado do texto. Assim quem não conhece o app não precisa descobrir
+    // uma área pequena e invisível para abrir o teclado.
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => focusNode.requestFocus(),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          gradient: isFocused
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF312651), AppColors.surfaceCard],
+                )
+              : null,
+          color: isFocused ? null : AppColors.surfaceCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isFocused ? AppColors.purplePrimary : AppColors.borderDivider,
+            width: isFocused ? 1.5 : 1,
+          ),
+          boxShadow: isFocused
+              ? const [
+                  BoxShadow(
+                    color: Color(0x336C56C9),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
@@ -778,13 +930,66 @@ class _MessageComposerField extends StatelessWidget {
             maxLines: 3,
             style: const TextStyle(color: AppColors.textPrimary),
             decoration: const InputDecoration(
+              hintText: 'Toque aqui para escrever sua mensagem',
+              hintStyle: TextStyle(color: AppColors.textSecondary),
               border: InputBorder.none,
               isDense: true,
             ),
           ),
           const SizedBox(height: 4),
         ],
+        ),
       ),
+    );
+  }
+}
+
+/// Cabeçalho colorido e consistente das etapas da campanha. O ícone e a
+/// pílula tornam a sequência mais escaneável sem depender apenas de texto.
+class _CampaignSectionTitle extends StatelessWidget {
+  const _CampaignSectionTitle({
+    required this.icon,
+    required this.title,
+    this.trailing,
+    this.greenAccent = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? trailing;
+  final bool greenAccent;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = greenAccent ? AppColors.greenPrimary : AppColors.purplePrimary;
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: accent.withOpacity(0.18),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: accent),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+        ),
+        if (trailing != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              trailing!,
+              style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -845,11 +1050,12 @@ class _MediaOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.purplePrimary : AppColors.surfaceCard,
+          gradient: selected ? AppColors.heroGradient : null,
+          color: selected ? null : AppColors.surfaceCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected
-                ? AppColors.purplePrimary
+                ? Colors.transparent
                 : AppColors.borderDivider,
           ),
         ),

@@ -57,10 +57,15 @@ class _RootShellScreenState extends State<RootShellScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     final pages = <Widget>[
-      InicioScreen(connectionRepository: widget.connectionRepository),
+      InicioScreen(
+        connectionRepository: widget.connectionRepository,
+        walletRepository: widget.walletRepository,
+      ),
       MensagensScreen(
         messageRepository: widget.messageRepository,
         contactRepository: widget.contactRepository,
+        connectionRepository: widget.connectionRepository,
+        walletRepository: widget.walletRepository,
       ),
       MenuScreen(
         menuRepository: widget.menuRepository,

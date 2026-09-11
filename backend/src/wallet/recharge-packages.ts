@@ -33,5 +33,30 @@ export const RECHARGE_PACKAGES: readonly RechargePackage[] = [
 ];
 
 export function findRechargePackage(id: string): RechargePackage | undefined {
-  return RECHARGE_PACKAGES.find((pkg) => pkg.id === id);
+  const fixed = RECHARGE_PACKAGES.find((pkg) => pkg.id === id);
+  if (fixed) return fixed;
+
+  const match = /^personalizada-(\d{4,7})$/.exec(id);
+  if (!match) return undefined;
+  const amountCents = Number(match[1]);
+  // R$10 a R$99.999,99: evita cobrança acidental muito baixa/alta. A faixa
+  // de bônus é idêntica à dos pacotes fixos; só o valor é livre.
+  if (amountCents < 1_000 || amountCents > 9_999_999) return undefined;
+  const bonusPercent = bonusForAmount(amountCents);
+  const baseCredits = amountCents / 10;
+  return {
+    id,
+    amountCents,
+    bonusPercent,
+    credits: Math.floor(baseCredits * (1 + bonusPercent / 100)),
+  };
+}
+
+/** Mesmas faixas progressivas exibidas nos pacotes fixos. */
+export function bonusForAmount(amountCents: number): number {
+  if (amountCents >= 50_000) return 65;
+  if (amountCents >= 30_000) return 50;
+  if (amountCents >= 10_000) return 35;
+  if (amountCents >= 5_000) return 20;
+  return 10;
 }

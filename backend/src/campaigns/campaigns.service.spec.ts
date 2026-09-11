@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { SessionStatus } from '@prisma/client';
 import { CampaignsService } from './campaigns.service';
 
 /**
@@ -6,9 +7,8 @@ import { CampaignsService } from './campaigns.service';
  * etapa 15 (aqui só persiste estrutura em PENDENTE, nunca envia nada), a
  * resolução de destinatários sempre restrita a `Contact.status = VALIDO`
  * (README raiz §13), a adoção de mídia (rejeita id inexistente/já usado e
- * tipos mistos), o caso-limite `recipientCount === 0` → campanha já nasce
- * ENVIADA (mesma lógica do mock, que não tem estado "pendente sem ninguém
- * para enviar"), e o débito "tudo ou nada" da carteira de créditos via
+ * tipos mistos), a rejeição antecipada quando não há destinatários válidos
+ * (nenhuma campanha vazia entra no histórico), e o débito "tudo ou nada" da carteira de créditos via
  * `debitWalletOrThrow` (privado, exercitado indiretamente através de
  * `tx.wallet`/`tx.walletTransaction`), chamado DENTRO da mesma transação,
  * antes de `Envio.createMany` — ver comentário em `campaigns.service.ts`).
@@ -17,7 +17,10 @@ describe('CampaignsService', () => {
   function buildService() {
     let nextCampaignId = 1;
 
-    const txContact = { findMany: jest.fn(async () => [] as { id: string }[]) };
+    const txContact = { findMany: jest.fn(async () => [{ id: 'contact-1' }] as { id: string }[]) };
+    const txSession = {
+      findUnique: jest.fn(async () => ({ status: SessionStatus.CONECTADA })),
+    };
     const txCampaign = {
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
         id: `campaign-${nextCampaignId++}`,
@@ -52,6 +55,7 @@ describe('CampaignsService', () => {
     const txWalletTransaction = { create: jest.fn(async () => ({ id: 'wtx-1' })) };
 
     const tx = {
+      session: txSession,
       contact: txContact,
       campaign: txCampaign,
       campaignMessage: txCampaignMessage,
@@ -71,6 +75,7 @@ describe('CampaignsService', () => {
       service,
       prisma,
       tx,
+      txSession,
       txContact,
       txCampaign,
       txCampaignMessage,
@@ -118,15 +123,13 @@ describe('CampaignsService', () => {
       });
     });
 
-    it('recipientCount === 0 já nasce ENVIADA e não cria recipients nem envios', async () => {
+    it('rejeita sem contatos válidos antes de criar uma campanha', async () => {
       const { service, txContact, txCampaign, txCampaignRecipient, txEnvio } = buildService();
       txContact.findMany.mockResolvedValue([]);
 
-      await service.createCampaign('user-1', { messages: ['Oi'] });
+      await expect(service.createCampaign('user-1', { messages: ['Oi'] })).rejects.toBeInstanceOf(BadRequestException);
 
-      expect(txCampaign.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: 'ENVIADA', recipientCount: 0, pendingCount: 0 }) }),
-      );
+      expect(txCampaign.create).not.toHaveBeenCalled();
       expect(txCampaignRecipient.createMany).not.toHaveBeenCalled();
       expect(txEnvio.createMany).not.toHaveBeenCalled();
     });
@@ -271,11 +274,11 @@ describe('CampaignsService', () => {
       expect(sendQueue.enqueueCampaign).not.toHaveBeenCalled();
     });
 
-    it('recipientCount === 0 não consulta a carteira (nada a enfileirar)', async () => {
+    it('sem contatos válidos, não consulta a carteira nem cria histórico', async () => {
       const { service, txContact, txWallet } = buildService();
       txContact.findMany.mockResolvedValue([]);
 
-      await service.createCampaign('user-1', { messages: ['Oi'] });
+      await expect(service.createCampaign('user-1', { messages: ['Oi'] })).rejects.toBeInstanceOf(BadRequestException);
 
       expect(txWallet.findUnique).not.toHaveBeenCalled();
     });
@@ -295,11 +298,11 @@ describe('CampaignsService', () => {
       expect(sendWorker.ensureWorker).toHaveBeenCalledWith('session-42');
     });
 
-    it('recipientCount === 0 não chama enqueueCampaign nem ensureWorker', async () => {
+    it('sem contatos válidos não chama enqueueCampaign nem ensureWorker', async () => {
       const { service, txContact, sendQueue, sendWorker } = buildService();
       txContact.findMany.mockResolvedValue([]);
 
-      await service.createCampaign('user-1', { messages: ['Oi'] });
+      await expect(service.createCampaign('user-1', { messages: ['Oi'] })).rejects.toBeInstanceOf(BadRequestException);
 
       expect(sendQueue.enqueueCampaign).not.toHaveBeenCalled();
       expect(sendWorker.ensureWorker).not.toHaveBeenCalled();

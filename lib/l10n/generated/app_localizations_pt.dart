@@ -58,14 +58,15 @@ class AppLocalizationsPt extends AppLocalizations {
   String get auth_cadastro_submit_button => 'Cadastrar';
 
   @override
-  String get auth_cadastro_login_link => 'Já tem uma conta? Entrar';
-
-  @override
-  String get auth_cadastro_email_in_use_error => 'Este email já está cadastrado';
+  String get auth_cadastro_email_in_use_error =>
+      'Este email já está cadastrado';
 
   @override
   String get auth_cadastro_network_error =>
       'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.';
+
+  @override
+  String get auth_cadastro_login_link => 'Já tem uma conta? Entrar';
 
   @override
   String get auth_codigo_title => 'Confirme seu email';
@@ -188,7 +189,8 @@ class AppLocalizationsPt extends AppLocalizations {
       'Conectar por número de telefone';
 
   @override
-  String get home_connection_phone_dialog_label => 'Número internacional (DDI + número)';
+  String get home_connection_phone_dialog_label =>
+      'Número internacional (DDI + número)';
 
   @override
   String get home_connection_phone_dialog_instructions =>
@@ -457,8 +459,7 @@ class AppLocalizationsPt extends AppLocalizations {
       'Trocar arquivo';
 
   @override
-  String get messages_nova_campanha_media_remove_file_button =>
-      'Remover mídia';
+  String get messages_nova_campanha_media_remove_file_button => 'Remover mídia';
 
   @override
   String get messages_nova_campanha_media_no_file_warning =>
@@ -467,6 +468,14 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get messages_nova_campanha_media_pick_error =>
       'Não foi possível selecionar o arquivo. Tente novamente.';
+
+  @override
+  String get messages_nova_campanha_whatsapp_required =>
+      'Conecte seu WhatsApp na tela Início antes de iniciar uma campanha.';
+
+  @override
+  String get messages_nova_campanha_balance_required =>
+      'Você não tem créditos suficientes para esta campanha. Vamos abrir a recarga.';
 
   @override
   String get messages_nova_campanha_interval_section_title =>
@@ -562,6 +571,27 @@ class AppLocalizationsPt extends AppLocalizations {
   String get wallet_packages_section_title => 'Escolha um pacote';
 
   @override
+  String get wallet_custom_amount_title => 'Outro valor';
+
+  @override
+  String get wallet_custom_amount_description =>
+      'Escolha o valor da sua recarga. O bônus é calculado automaticamente conforme a faixa.';
+
+  @override
+  String get wallet_custom_amount_label => 'Valor em reais';
+
+  @override
+  String get wallet_custom_amount_continue => 'Continuar';
+
+  @override
+  String get wallet_credits_explanation =>
+      'Cada crédito permite enviar uma mensagem pelo ZaBot. Você só usa créditos quando uma mensagem é enviada.';
+
+  @override
+  String get wallet_bonus_explanation =>
+      'Quanto maior a recarga, maior o bônus aplicado automaticamente.';
+
+  @override
   String wallet_package_credits_label(int credits) {
     return '$credits créditos';
   }
@@ -612,13 +642,15 @@ class AppLocalizationsPt extends AppLocalizations {
   String get wallet_method_pix_label => 'Pix';
 
   @override
-  String get wallet_method_pix_description => 'Pagamento instantâneo via QR code';
+  String get wallet_method_pix_description =>
+      'Pagamento instantâneo via QR code';
 
   @override
   String get wallet_method_card_label => 'Cartão de crédito';
 
   @override
-  String get wallet_method_card_description => 'Pagamento à vista, aprovação na hora';
+  String get wallet_method_card_description =>
+      'Pagamento à vista, aprovação na hora';
 
   @override
   String get wallet_card_form_title => 'Dados do cartão';
@@ -648,10 +680,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get wallet_card_processing_label => 'Processando pagamento...';
 
   @override
-  String get wallet_card_form_invalid_error => 'Preencha todos os campos corretamente antes de continuar.';
+  String get wallet_card_form_invalid_error =>
+      'Preencha todos os campos corretamente antes de continuar.';
 
   @override
-  String get wallet_card_generic_error => 'Não foi possível concluir o pagamento com cartão. Tente novamente ou use Pix.';
+  String get wallet_card_generic_error =>
+      'Não foi possível concluir o pagamento com cartão. Tente novamente ou use Pix.';
 
   @override
   String get menu_settings_card_title => 'Configurações';

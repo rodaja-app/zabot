@@ -76,6 +76,14 @@ class ZaBotApp extends StatelessWidget {
       supportedLocales: const [
         Locale('pt'),
       ],
+      // Fecha o teclado ao tocar fora de um campo, sem disputar o gesto com
+      // botões, listas e outros controles. Como envolve o Navigator inteiro,
+      // a regra também vale para telas abertas por rota, diálogos e modais.
+      builder: (context, child) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+        child: child ?? const SizedBox.shrink(),
+      ),
       // Com sessão salva (`AuthTokenStore.hasSession`), pula direto pra tela
       // de abertura — que já cuida de seguir para RootShellScreen sozinha —
       // em vez de pedir login de novo a cada abertura do app. Sem sessão,

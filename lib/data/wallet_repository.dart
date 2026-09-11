@@ -16,7 +16,7 @@ abstract class WalletRepository {
   /// Cria uma cobrança para o pacote [packageId]. Sem os parâmetros de
   /// cartão, cria uma cobrança Pix — retorna o QR/copia-e-cola com
   /// `status = RechargeStatus.pending`, confirmação via polling de
-  /// [getBalance] (não há push/socket para isso ainda). Com [cardToken]
+  /// [getRechargeStatus] (que também funciona quando o webhook atrasa). Com [cardToken]
   /// preenchido (tokenizado no app via `MercadoPagoCardTokenizer`, nunca
   /// dado de cartão em texto puro), cria uma cobrança de cartão — resposta
   /// já vem síncrona (`status = paid` ou `failed`, ver backend
@@ -28,6 +28,9 @@ abstract class WalletRepository {
     String? payerCpf,
   });
 
+  /// Consulta e sincroniza uma recarga Pix pendente com o Mercado Pago.
+  Future<RechargeResult> getRechargeStatus(String transactionId);
+
   /// Chave pública do Mercado Pago para tokenizar cartão no app
   /// (`GET /wallet/mercadopago-public-key`) — nunca hardcoded no código-fonte
   /// (ver `MercadoPagoApiService.publicKey` no backend).
@@ -36,6 +39,7 @@ abstract class WalletRepository {
 
 class MockWalletRepository implements WalletRepository {
   int _balance = 480;
+  final Set<String> _paidTransactions = {};
 
   final List<RechargePackage> _packages = const [
     RechargePackage(id: 'recarga-20', priceLabel: 'R\$ 20,00', credits: 220, bonusPercent: 10),
@@ -84,15 +88,31 @@ class MockWalletRepository implements WalletRepository {
     // Simula confirmação automática do pagamento Pix após um tempo, só para
     // o mock ter algum estado observável em telas de desenvolvimento sem
     // backend (o app real depende do webhook do Mercado Pago).
+    final transactionId = 'mock-${DateTime.now().millisecondsSinceEpoch}';
     Future<void>.delayed(const Duration(seconds: 6), () {
       _balance += package.credits;
+      _paidTransactions.add(transactionId);
     });
     return RechargeResult(
-      transactionId: 'mock-${DateTime.now().millisecondsSinceEpoch}',
+      transactionId: transactionId,
       status: RechargeStatus.pending,
       credits: package.credits,
       priceLabel: package.priceLabel,
       pixQrCode: '00020126360014BR.GOV.BCB.PIX0114mock-copia-e-cola',
+      pixQrCodeBase64: null,
+    );
+  }
+
+  @override
+  Future<RechargeResult> getRechargeStatus(String transactionId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    final package = _packages.first;
+    return RechargeResult(
+      transactionId: transactionId,
+      status: _paidTransactions.contains(transactionId) ? RechargeStatus.paid : RechargeStatus.pending,
+      credits: package.credits,
+      priceLabel: package.priceLabel,
+      pixQrCode: null,
       pixQrCodeBase64: null,
     );
   }

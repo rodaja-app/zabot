@@ -7,14 +7,19 @@ import 'package:rive/rive.dart' hide Image;
 
 import '../../data/connection_repository.dart';
 import '../../data/models/home_stats.dart';
+import '../../data/models/wallet.dart';
 import '../../data/models/zap_connection_status.dart';
 import '../../data/models/zap_session_info.dart';
+import '../../data/wallet_repository.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/app_page_route.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/wallet_summary_card.dart';
+import '../wallet/wallet_recharge_screen.dart';
 
 /// Tela Início (Etapa 4, README.md seção 13).
 ///
@@ -26,9 +31,10 @@ import '../../widgets/status_badge.dart';
 /// [ConnectionRepository] mockado — trocar pela implementação real só na
 /// Etapa 17 (integração final).
 class InicioScreen extends StatefulWidget {
-  const InicioScreen({super.key, required this.connectionRepository});
+  const InicioScreen({super.key, required this.connectionRepository, required this.walletRepository});
 
   final ConnectionRepository connectionRepository;
+  final WalletRepository walletRepository;
 
   @override
   State<InicioScreen> createState() => _InicioScreenState();
@@ -62,6 +68,8 @@ class _InicioScreenState extends State<InicioScreen> {
   StreamSubscription<String?>? _qrCodeSubscription;
   String? _pairingCode;
   StreamSubscription<String?>? _pairingCodeSubscription;
+  bool _qrDialogOpen = false;
+  Future<Wallet>? _walletFuture;
 
   @override
   void initState() {
@@ -81,6 +89,12 @@ class _InicioScreenState extends State<InicioScreen> {
           _pairingCode = null;
         }
       });
+      if (status != ZapConnectionStatus.connecting && _qrDialogOpen) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_qrDialogOpen) return;
+          Navigator.of(context, rootNavigator: true).pop();
+        });
+      }
     });
 
     _session = widget.connectionRepository.currentSession;
@@ -107,6 +121,7 @@ class _InicioScreenState extends State<InicioScreen> {
     });
 
     _loadStats();
+    _refreshWallet();
 
     // Contadores "ao vivo" (Etapa 7): assim que chega uma atualização pelo
     // stream, ela substitui o valor exibido, sem precisar de um novo
@@ -139,6 +154,15 @@ class _InicioScreenState extends State<InicioScreen> {
         _statsLoading = false;
       });
     }
+  }
+
+  void _refreshWallet() => setState(() => _walletFuture = widget.walletRepository.getBalance());
+
+  Future<void> _openWalletRecharge() async {
+    final refreshed = await Navigator.of(context).push<bool>(
+      AppPageRoute(builder: (_) => WalletRechargeScreen(walletRepository: widget.walletRepository)),
+    );
+    if (refreshed == true) _refreshWallet();
   }
 
   @override
@@ -262,6 +286,7 @@ class _InicioScreenState extends State<InicioScreen> {
           _qrCode = null;
           _pairingCode = null;
         });
+        _showQrConnectionDialog(context, l10n);
         await widget.connectionRepository.connect();
         break;
       case _ConnectOption.phoneNumber:
@@ -317,6 +342,55 @@ class _InicioScreenState extends State<InicioScreen> {
     );
   }
 
+  void _showQrConnectionDialog(BuildContext context, AppLocalizations l10n) {
+    if (_qrDialogOpen) return;
+    _qrDialogOpen = true;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            backgroundColor: AppColors.surfaceCard,
+            title: Text(l10n.home_connection_connect_sheet_title),
+            content: StreamBuilder<String?>(
+              stream: widget.connectionRepository.qrCodeStream,
+              initialData: widget.connectionRepository.currentQrCode,
+              builder: (context, snapshot) {
+                final qrCode = snapshot.data;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (qrCode == null)
+                      const SizedBox(
+                        width: 240,
+                        height: 240,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else
+                      _QrCodePlaceholder(qrCode: qrCode),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.home_connection_qr_instructions,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                );
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => widget.connectionRepository.disconnect(),
+                child: Text(l10n.home_connection_cancel_button),
+              ),
+            ],
+          ),
+        ),
+      ).whenComplete(() => _qrDialogOpen = false),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -325,6 +399,8 @@ class _InicioScreenState extends State<InicioScreen> {
       padding: const EdgeInsets.all(24),
       children: [
         _ReactiveMascot(status: _status),
+        const SizedBox(height: 24),
+        WalletSummaryCard(walletFuture: _walletFuture, l10n: l10n, onTap: _openWalletRecharge),
         const SizedBox(height: 24),
         _ConnectionCard(
           status: _status,
@@ -500,6 +576,18 @@ class _ConnectionCard extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       letterSpacing: 2,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                ] else if (qrCode != null) ...[
+                  // Alguns aparelhos/contas não recebem código por número,
+                  // mas o mesmo socket já entrega QR. Exibi-lo aqui evita um
+                  // fluxo parado e ainda permite concluir a conexão.
+                  const SizedBox(height: 12),
+                  _QrCodePlaceholder(qrCode: qrCode),
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.home_connection_qr_instructions,
+                    style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
                 ],

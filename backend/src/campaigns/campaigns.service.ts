@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CampaignMediaType, CampaignStatus, Prisma, WalletTransactionType } from '@prisma/client';
-import { InsufficientBalanceError } from '../common/errors/app-error';
+import { CampaignMediaType, CampaignStatus, Prisma, SessionStatus, WalletTransactionType } from '@prisma/client';
+import { InsufficientBalanceError, SessionNotConnectedError } from '../common/errors/app-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageQueueService } from '../sending/send-message.queue';
 import { SendMessageWorker } from '../sending/send-message.worker';
@@ -50,14 +50,32 @@ export class CampaignsService {
     let createdCampaignId: string | undefined;
 
     await this.prisma.withTenantContext(userId, async (tx) => {
-      const media = await this.adoptMedia(tx, userId, dto.mediaIds ?? []);
+      // Uma campanha só existe quando pode de fato ser enviada. Assim não
+      // poluímos o histórico com tentativas feitas sem um WhatsApp conectado.
+      const session = await tx.session.findUnique({
+        where: { userId },
+        select: { status: true },
+      });
+      if (session?.status !== SessionStatus.CONECTADA) {
+        throw new SessionNotConnectedError(
+          'Conecte seu WhatsApp na tela Início antes de iniciar uma campanha.',
+        );
+      }
+
       const recipientContactIds = await this.resolveRecipientContactIds(tx, dto.recipientIds);
       const recipientCount = recipientContactIds.length;
+      if (recipientCount === 0) {
+        throw new BadRequestException(
+          'Não há contatos válidos para esta campanha. Aguarde a validação dos números e tente novamente.',
+        );
+      }
+
+      const media = await this.adoptMedia(tx, userId, dto.mediaIds ?? []);
 
       const campaign = await tx.campaign.create({
         data: {
           userId,
-          status: recipientCount === 0 ? CampaignStatus.ENVIADA : CampaignStatus.PENDENTE,
+          status: CampaignStatus.PENDENTE,
           mediaType: media.type,
           mediaCount: media.ids.length,
           recipientCount,
@@ -75,8 +93,6 @@ export class CampaignsService {
           data: { campaignId: campaign.id },
         });
       }
-
-      if (recipientCount === 0) return;
 
       await tx.campaignRecipient.createMany({
         data: recipientContactIds.map((contactId) => ({ campaignId: campaign.id, contactId, userId })),
@@ -113,9 +129,8 @@ export class CampaignsService {
     // Fora da transação de cima (só depois de commitada de verdade — os
     // `Envio` PENDENTE precisam estar visíveis para a query que `enqueueCampaign`
     // faz na sua própria transação). `createdCampaignId` só fica setado
-    // quando `recipientCount > 0` (campanha com `Envio`s de verdade para
-    // enfileirar); campanha sem destinatário já nasce ENVIADA acima e não
-    // tem nada para o worker consumir.
+    // quando há envios de verdade para enfileirar: tentativas sem sessão,
+    // contatos válidos ou saldo são rejeitadas antes de a campanha existir.
     if (createdCampaignId) {
       const sessionId = await this.sendQueue.enqueueCampaign(userId, createdCampaignId);
       if (sessionId) this.sendWorker.ensureWorker(sessionId);

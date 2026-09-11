@@ -9,7 +9,6 @@ import '../../data/message_repository.dart';
 import '../../data/models/app_info.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/models/user_account.dart';
-import '../../data/models/wallet.dart';
 import '../../data/wallet_repository.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../theme/app_theme.dart';
@@ -17,7 +16,6 @@ import '../../widgets/app_page_route.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/status_badge.dart';
 import '../auth/login_screen.dart';
-import '../wallet/wallet_recharge_screen.dart';
 
 /// Tela Menu (Etapa 6, README.md seção 13).
 ///
@@ -54,7 +52,6 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   Future<UserAccount>? _accountFuture;
-  Future<Wallet>? _walletFuture;
   Future<AppInfo>? _appInfoFuture;
   AppSettings? _settings;
 
@@ -65,7 +62,6 @@ class _MenuScreenState extends State<MenuScreen> {
   void initState() {
     super.initState();
     _loadAccount();
-    _refreshWallet();
     _appInfoFuture = widget.menuRepository.getAppInfo();
     widget.menuRepository.getSettings().then((settings) {
       if (!mounted) return;
@@ -82,24 +78,6 @@ class _MenuScreenState extends State<MenuScreen> {
   void _updateSettings(AppSettings settings) {
     setState(() => _settings = settings);
     widget.menuRepository.updateSettings(settings);
-  }
-
-  void _refreshWallet() {
-    setState(() => _walletFuture = widget.walletRepository.getBalance());
-  }
-
-  /// Abre a tela de recarga; ao voltar (`Navigator.pop(true)` em
-  /// `WalletRechargeScreen._finish`), o saldo é buscado de novo — evita
-  /// mostrar o saldo desatualizado depois de uma recarga concluída.
-  Future<void> _openWalletRecharge() async {
-    final refreshed = await Navigator.of(context).push<bool>(
-      AppPageRoute(
-        builder: (_) => WalletRechargeScreen(
-          walletRepository: widget.walletRepository,
-        ),
-      ),
-    );
-    if (refreshed == true) _refreshWallet();
   }
 
   Future<void> _goToLogin() async {
@@ -142,12 +120,6 @@ class _MenuScreenState extends State<MenuScreen> {
           accountFuture: _accountFuture,
           l10n: l10n,
           onRetry: _loadAccount,
-        ),
-        const SizedBox(height: 24),
-        _WalletCard(
-          walletFuture: _walletFuture,
-          l10n: l10n,
-          onTap: _openWalletRecharge,
         ),
         const SizedBox(height: 24),
         _SettingsCard(
@@ -276,79 +248,6 @@ class _AccountCard extends StatelessWidget {
         ),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => _showAccountDialog(context),
-      ),
-    );
-  }
-}
-
-/// Cartão destacado (degradê roxo→verde) exibindo o saldo de créditos —
-/// fica logo abaixo de "Minha Conta" para dar mais peso visual à carteira.
-/// Substitui o antigo `_PlanCard`/RevenueCat: em vez de abrir um diálogo de
-/// detalhes, o toque leva direto para [WalletRechargeScreen] (o fluxo de
-/// recarga precisa de tela cheia, por causa do QR code + polling, o que não
-/// cabe bem num modal).
-class _WalletCard extends StatelessWidget {
-  const _WalletCard({
-    required this.walletFuture,
-    required this.l10n,
-    required this.onTap,
-  });
-
-  final Future<Wallet>? walletFuture;
-  final AppLocalizations l10n;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: AppColors.heroGradient,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.wallet_card_title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      FutureBuilder<Wallet>(
-                        future: walletFuture,
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return const SizedBox.shrink();
-                          }
-                          return Text(
-                            l10n.wallet_card_balance_label(
-                              snapshot.data!.balance,
-                            ),
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: AppColors.textPrimary),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textPrimary,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -44,7 +44,6 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
   _Stage _stage = _Stage.packages;
   bool _isCreatingRecharge = false;
   RechargeResult? _rechargeResult;
-  int? _balanceBeforeRecharge;
   Timer? _pollTimer;
 
   RechargePackage? _selectedPackage;
@@ -91,6 +90,62 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
     });
   }
 
+  Future<void> _chooseCustomAmount(AppLocalizations l10n) async {
+    final controller = TextEditingController();
+    final amount = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surfaceCard,
+        title: Text(l10n.wallet_custom_amount_title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.wallet_custom_amount_description),
+            const SizedBox(height: 16),
+            AppTextField(
+              label: l10n.wallet_custom_amount_label,
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(l10n.common_cancel)),
+          TextButton(
+            onPressed: () {
+              final value = double.tryParse(controller.text.replaceAll(',', '.'));
+              Navigator.of(dialogContext).pop(value);
+            },
+            child: Text(l10n.wallet_custom_amount_continue),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (amount == null || amount < 10) return;
+
+    final cents = (amount * 100).round();
+    final bonus = _bonusForAmount(cents);
+    final credits = ((cents / 10) * (1 + bonus / 100)).floor();
+    _choosePackage(
+      RechargePackage(
+        id: 'personalizada-$cents',
+        priceLabel: 'R\$ ${amount.toStringAsFixed(2).replaceAll('.', ',')}',
+        credits: credits,
+        bonusPercent: bonus,
+      ),
+    );
+  }
+
+  int _bonusForAmount(int cents) {
+    if (cents >= 50000) return 65;
+    if (cents >= 30000) return 50;
+    if (cents >= 10000) return 35;
+    if (cents >= 5000) return 20;
+    return 10;
+  }
+
   void _handleBack() {
     setState(() {
       if (_stage == _Stage.cardForm) {
@@ -106,11 +161,9 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
   Future<void> _startPixRecharge(RechargePackage package, AppLocalizations l10n) async {
     setState(() => _isCreatingRecharge = true);
     try {
-      final balance = await widget.walletRepository.getBalance();
       final result = await widget.walletRepository.createRecharge(package.id);
       if (!mounted) return;
       setState(() {
-        _balanceBeforeRecharge = balance.balance;
         _rechargeResult = result;
         _isCreatingRecharge = false;
         _stage = _Stage.paying;
@@ -227,12 +280,12 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      final before = _balanceBeforeRecharge;
-      if (before == null) return;
+      final recharge = _rechargeResult;
+      if (recharge == null) return;
       try {
-        final wallet = await widget.walletRepository.getBalance();
+        final status = await widget.walletRepository.getRechargeStatus(recharge.transactionId);
         if (!mounted) return;
-        if (wallet.balance > before) {
+        if (status.status == RechargeStatus.paid) {
           _pollTimer?.cancel();
           setState(() => _stage = _Stage.success);
         }
@@ -304,6 +357,10 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
               l10n.wallet_packages_section_title,
               style: Theme.of(context).textTheme.titleMedium,
             ),
+            const SizedBox(height: 8),
+            Text(l10n.wallet_credits_explanation, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 4),
+            Text(l10n.wallet_bonus_explanation, style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 16),
             for (final package in packages) ...[
               _PackageTile(
@@ -314,6 +371,11 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
               ),
               const SizedBox(height: 12),
             ],
+            OutlinedButton.icon(
+              onPressed: _isCreatingRecharge ? null : () => _chooseCustomAmount(l10n),
+              icon: const Icon(Icons.edit_rounded),
+              label: Text(l10n.wallet_custom_amount_title),
+            ),
             if (_isCreatingRecharge) ...[
               const SizedBox(height: 12),
               const Center(

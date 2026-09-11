@@ -35,7 +35,9 @@ export type WalletPaymentMethod = (typeof WALLET_PAYMENT_METHODS)[number];
  * pelo Mercado Pago para cartão no Brasil).
  */
 export class CreateRechargeDto {
-  @IsIn(RECHARGE_PACKAGES.map((pkg) => pkg.id))
+  @Matches(/^(recarga-(20|50|100|300|500)|personalizada-\d{4,7})$/, {
+    message: 'Pacote de recarga inválido.',
+  })
   packageId!: string;
 
   @IsOptional()

@@ -566,6 +566,14 @@
   "@messages_nova_campanha_media_pick_error": {
     "description": "Snackbar exibida quando o seletor de arquivos nativo falha"
   },
+  "messages_nova_campanha_whatsapp_required": "Conecte seu WhatsApp na tela Início antes de iniciar uma campanha.",
+  "@messages_nova_campanha_whatsapp_required": {
+    "description": "Aviso exibido quando o usuário tenta iniciar uma campanha sem uma sessão WhatsApp conectada"
+  },
+  "messages_nova_campanha_balance_required": "Você não tem créditos suficientes para esta campanha. Vamos abrir a recarga.",
+  "@messages_nova_campanha_balance_required": {
+    "description": "Aviso exibido antes de abrir a recarga quando o saldo não cobre todos os envios"
+  },
   "messages_nova_campanha_interval_section_title": "Intervalo de envio",
   "@messages_nova_campanha_interval_section_title": {
     "description": "Título da seção de intervalo aleatório entre envios"
@@ -678,6 +686,30 @@
   "wallet_packages_section_title": "Escolha um pacote",
   "@wallet_packages_section_title": {
     "description": "Título da lista de pacotes de recarga"
+  },
+  "wallet_custom_amount_title": "Outro valor",
+  "@wallet_custom_amount_title": {
+    "description": "Ação para informar valor livre de recarga"
+  },
+  "wallet_custom_amount_description": "Escolha o valor da sua recarga. O bônus é calculado automaticamente conforme a faixa.",
+  "@wallet_custom_amount_description": {
+    "description": "Explicação do valor livre de recarga"
+  },
+  "wallet_custom_amount_label": "Valor em reais",
+  "@wallet_custom_amount_label": {
+    "description": "Rótulo do campo de valor livre"
+  },
+  "wallet_custom_amount_continue": "Continuar",
+  "@wallet_custom_amount_continue": {
+    "description": "Botão para avançar após informar valor livre"
+  },
+  "wallet_credits_explanation": "Cada crédito permite enviar uma mensagem pelo ZaBot. Você só usa créditos quando uma mensagem é enviada.",
+  "@wallet_credits_explanation": {
+    "description": "Explicação de como os créditos são consumidos"
+  },
+  "wallet_bonus_explanation": "Quanto maior a recarga, maior o bônus aplicado automaticamente.",
+  "@wallet_bonus_explanation": {
+    "description": "Explicação das faixas de bônus"
   },
   "wallet_package_credits_label": "{credits} créditos",
   "@wallet_package_credits_label": {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Headers, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Headers, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUserId } from '../auth/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateRechargeDto, MercadoPagoPublicKeyDto, RechargePackageDto, RechargeResultDto, WalletDto } from './dto/wallet.dto';
@@ -32,6 +32,13 @@ export class WalletController {
   @Post('recharge')
   createRecharge(@CurrentUserId() userId: string, @Body() dto: CreateRechargeDto): Promise<RechargeResultDto> {
     return this.walletService.createRecharge(userId, dto);
+  }
+
+  /** Confirma uma recarga Pix pendente diretamente no Mercado Pago quando o webhook atrasar. */
+  @UseGuards(JwtAuthGuard)
+  @Get('recharge/:transactionId')
+  getRechargeStatus(@CurrentUserId() userId: string, @Param('transactionId') transactionId: string): Promise<RechargeResultDto> {
+    return this.walletService.syncRechargeStatus(userId, transactionId);
   }
 
   /**

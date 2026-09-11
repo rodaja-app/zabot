@@ -53,6 +53,12 @@ class ApiWalletRepository implements WalletRepository {
   }
 
   @override
+  Future<RechargeResult> getRechargeStatus(String transactionId) async {
+    final body = await _apiClient.get('/wallet/recharge/$transactionId') as Map<String, dynamic>;
+    return _resultFromJson(body);
+  }
+
+  @override
   Future<String?> getMercadoPagoPublicKey() async {
     final body = await _apiClient.get('/wallet/mercadopago-public-key') as Map<String, dynamic>;
     return body['publicKey'] as String?;
