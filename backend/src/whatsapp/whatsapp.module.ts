@@ -6,6 +6,7 @@ import { ProxyConfigService } from './proxy-config.service';
 import { SessionController } from './session.controller';
 import { SessionGateway } from './session.gateway';
 import { SessionService } from './session.service';
+import { WhatsAppDiagnosticsService } from './whatsapp-diagnostics.service';
 import { WhatsAppProvider } from './whatsapp-provider.interface';
 
 /**
@@ -25,6 +26,7 @@ import { WhatsAppProvider } from './whatsapp-provider.interface';
     ProxyConfigService,
     SessionService,
     SessionGateway,
+    WhatsAppDiagnosticsService,
   ],
   // WhatsAppProvider exportado a partir da etapa 13 — ContactsModule precisa
   // dele para `checkNumbers()` (verificação de número), sem reabrir a
@@ -36,6 +38,10 @@ import { WhatsAppProvider } from './whatsapp-provider.interface';
   // ProxyConfigService exportado pra `HealthModule` poder expor
   // `GET /health/whatsapp` — diagnóstico de proxy/DataImpulse acessível pelo
   // navegador, mesmo motivo/padrão de `GET /health/smtp`.
-  exports: [SessionService, WhatsAppProvider, SessionGateway, ProxyConfigService],
+  // WhatsAppDiagnosticsService exportado pra `HealthModule` poder expor
+  // `GET /health/whatsapp-connect` — handshake Baileys real (efêmero, nunca
+  // toca sessão de usuário) acessível pelo navegador, pra confirmar a conexão
+  // de ponta a ponta sem precisar abrir o app/gerar APK.
+  exports: [SessionService, WhatsAppProvider, SessionGateway, ProxyConfigService, WhatsAppDiagnosticsService],
 })
 export class WhatsAppModule {}

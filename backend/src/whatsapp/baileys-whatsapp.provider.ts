@@ -46,7 +46,7 @@ const MIN_STICKY_RENEWAL_DELAY_MS = 30_000;
  */
 type BaileysLogger = Parameters<typeof makeWASocket>[0]['logger'];
 
-function silentBaileysLogger(): BaileysLogger {
+export function silentBaileysLogger(): BaileysLogger {
   const noop = () => undefined;
   const base: Record<string, unknown> = {
     level: 'silent',
@@ -278,8 +278,23 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
     }
 
     if (connection === 'close') {
-      const statusCode = (lastDisconnect?.error as { output?: { statusCode?: number } } | undefined)?.output
-        ?.statusCode;
+      // `lastDisconnect.error` é um Boom (@hapi/boom) na maioria dos casos —
+      // `describeDisconnect(statusCode)` já dá um rótulo categorizado bom pro
+      // status/UI, mas esconde a causa crua (`output.payload.message`,
+      // ex.: "Stream Errored (restart required)", "QR refs attempts ended",
+      // erro de rede do socket TCP por trás do proxy) que é o que de fato
+      // explica POR QUE a conexão caiu — sem isto, todo timeout vira só
+      // "timeout_ou_conexao_perdida" no log, sem pista nenhuma do motivo real.
+      const boom = lastDisconnect?.error as
+        | {
+            output?: { statusCode?: number; payload?: { message?: string; error?: string } };
+            message?: string;
+            code?: string;
+          }
+        | undefined;
+      const statusCode = boom?.output?.statusCode;
+      const rawMessage = boom?.output?.payload?.message ?? boom?.message;
+      const rawCode = boom?.code;
       const reasonLabel = this.describeDisconnect(statusCode);
       const definitive = this.isDefinitive(statusCode);
       const phoneNumber = this.sockets.get(sessionId)?.phoneNumber;
@@ -290,7 +305,7 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
       if (definitive) {
         await clearAuthState(this.prisma, sessionId, userId);
         this.logger.warn(
-          { event: 'whatsapp_session_ended', sessionId, reason: reasonLabel },
+          { event: 'whatsapp_session_ended', sessionId, reason: reasonLabel, statusCode, rawMessage, rawCode },
           'Sessão encerrada definitivamente — auth state removido, QR/pareamento novo necessário',
         );
         this.updates.next({ sessionId, status: 'DESCONECTADA', disconnectReason: reasonLabel, loggedOut: true });
@@ -298,7 +313,7 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
       }
 
       this.logger.warn(
-        { event: 'whatsapp_connection_dropped', sessionId, reason: reasonLabel },
+        { event: 'whatsapp_connection_dropped', sessionId, reason: reasonLabel, statusCode, rawMessage, rawCode },
         'Conexão caiu — agendando reconexão automática',
       );
       this.updates.next({ sessionId, status: 'CONECTANDO', disconnectReason: reasonLabel });

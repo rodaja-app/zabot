@@ -5,6 +5,7 @@ import { fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import { ResendEmailProvider } from '../email/resend-email.provider';
 import { SmtpEmailProvider } from '../email/smtp-email.provider';
 import { ProxyConfigService } from '../whatsapp/proxy-config.service';
+import { WhatsAppDiagnosticsService } from '../whatsapp/whatsapp-diagnostics.service';
 import { HealthService } from './health.service';
 
 /**
@@ -26,6 +27,7 @@ export class HealthController {
     private readonly smtp: SmtpEmailProvider,
     private readonly resend: ResendEmailProvider,
     private readonly proxyConfig: ProxyConfigService,
+    private readonly whatsappDiagnostics: WhatsAppDiagnosticsService,
   ) {}
 
   @Get()
@@ -120,6 +122,32 @@ export class HealthController {
       ok,
       proxy: { enabled: proxyEnabled, ...proxyResult },
       baileysVersion,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Diagnóstico de conexão WhatsApp PONTA A PONTA, acessível pelo navegador
+   * — vai além de `GET /health/whatsapp` (que só testa proxy e versão do
+   * protocolo): aqui é o handshake Baileys/Noise real através do proxy,
+   * com credenciais efêmeras (nunca uma sessão de usuário, nunca tocam o
+   * Postgres — ver `WhatsAppDiagnosticsService`). Criado porque
+   * `/health/whatsapp` veio 100% saudável mesmo com a conexão de verdade
+   * caindo com timeout — só um handshake de verdade revela a causa raiz.
+   * Responde só depois de receber QR (prova que o handshake funcionou) ou a
+   * conexão fechar com erro, ou 25s sem resposta — pode demorar a responder,
+   * isso é esperado.
+   */
+  @Get('whatsapp-connect')
+  async checkWhatsappConnect(@Res() res: Response): Promise<void> {
+    const result = await this.whatsappDiagnostics.testLiveConnection();
+
+    if (!result.ok) {
+      this.logger.warn({ event: 'whatsapp_live_test_failed', ...result }, 'Diagnóstico de conexão WhatsApp ao vivo falhou');
+    }
+
+    res.status(result.ok ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).json({
+      ...result,
       timestamp: new Date().toISOString(),
     });
   }
