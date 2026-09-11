@@ -416,8 +416,10 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
     }
 
     active.pairingCodeRequested = true;
+    // Também é usado no log de falha abaixo; precisa ficar fora do `try`
+    // para permanecer disponível caso `requestPairingCode` lance exceção.
+    const digitsOnly = active.phoneNumber.replace(/\D/g, '');
     try {
-      const digitsOnly = active.phoneNumber.replace(/\D/g, '');
       const code = await socket.requestPairingCode(digitsOnly);
       active.pairingCodeAttempts = 0;
       this.clearPairingCodeRetryTimer(sessionId);
