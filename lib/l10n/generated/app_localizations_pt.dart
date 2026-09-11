@@ -188,11 +188,11 @@ class AppLocalizationsPt extends AppLocalizations {
       'Conectar por número de telefone';
 
   @override
-  String get home_connection_phone_dialog_label => 'Número de telefone';
+  String get home_connection_phone_dialog_label => 'Número internacional (DDI + número)';
 
   @override
   String get home_connection_phone_dialog_instructions =>
-      'Você vai receber um código no WhatsApp desse número para confirmar a conexão.';
+      'Informe o número internacional completo em formato E.164: DDI + código de área + número, apenas dígitos (ex.: 14155552671). O código de pareamento aparecerá aqui no ZaBot.';
 
   @override
   String get home_stats_card_title => 'Resumo';

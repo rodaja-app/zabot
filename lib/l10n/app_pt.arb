@@ -247,11 +247,11 @@
   "@home_connection_phone_dialog_title": {
     "description": "Título do diálogo de conectar por número de telefone"
   },
-  "home_connection_phone_dialog_label": "Número de telefone",
+  "home_connection_phone_dialog_label": "Número internacional (DDI + número)",
   "@home_connection_phone_dialog_label": {
     "description": "Rótulo do campo de texto do diálogo de conectar por número de telefone"
   },
-  "home_connection_phone_dialog_instructions": "Você vai receber um código no WhatsApp desse número para confirmar a conexão.",
+  "home_connection_phone_dialog_instructions": "Informe o número internacional completo em formato E.164: DDI + código de área + número, apenas dígitos (ex.: 14155552671). O código de pareamento aparecerá aqui no ZaBot.",
   "@home_connection_phone_dialog_instructions": {
     "description": "Instruções exibidas no diálogo de conectar por número de telefone"
   },

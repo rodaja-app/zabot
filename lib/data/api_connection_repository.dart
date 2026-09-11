@@ -132,11 +132,18 @@ class ApiConnectionRepository implements ConnectionRepository {
     // Um fluxo de conexão concluído (ou cancelado/desconectado) não deixa QR
     // code/código de pareamento válidos para trás — sem isso, reconectar
     // podia mostrar por um instante o código do fluxo anterior.
-    _qrCode = _status == ZapConnectionStatus.connecting ? data['qr'] as String? : null;
+    if (_status != ZapConnectionStatus.connecting) {
+      _qrCode = null;
+      _pairingCode = null;
+    } else {
+      // Updates do Baileys são parciais: depois de enviar um QR/código ele
+      // pode informar apenas `connection: connecting`. Não transformar a
+      // ausência desses campos em `null`, pois isso apagava o QR/código
+      // ainda válido da tela antes de o usuário conseguir usá-lo.
+      if (data.containsKey('qr')) _qrCode = data['qr'] as String?;
+      if (data.containsKey('pairingCode')) _pairingCode = data['pairingCode'] as String?;
+    }
     _qrCodeController.add(_qrCode);
-
-    _pairingCode =
-        _status == ZapConnectionStatus.connecting ? data['pairingCode'] as String? : null;
     _pairingCodeController.add(_pairingCode);
   }
 

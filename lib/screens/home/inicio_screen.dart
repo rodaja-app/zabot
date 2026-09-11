@@ -257,7 +257,11 @@ class _InicioScreenState extends State<InicioScreen> {
 
     switch (option) {
       case _ConnectOption.qrCode:
-        setState(() => _connectMethod = _ConnectMethod.qrCode);
+        setState(() {
+          _connectMethod = _ConnectMethod.qrCode;
+          _qrCode = null;
+          _pairingCode = null;
+        });
         await widget.connectionRepository.connect();
         break;
       case _ConnectOption.phoneNumber:
@@ -265,7 +269,11 @@ class _InicioScreenState extends State<InicioScreen> {
         if (!mounted || phoneNumber == null || phoneNumber.trim().isEmpty) {
           return;
         }
-        setState(() => _connectMethod = _ConnectMethod.phoneNumber);
+        setState(() {
+          _connectMethod = _ConnectMethod.phoneNumber;
+          _qrCode = null;
+          _pairingCode = null;
+        });
         await widget.connectionRepository.connect(phoneNumber: phoneNumber);
         break;
     }
@@ -551,8 +559,8 @@ Uint8List? _decodeQrCodeDataUrl(String qrCode) {
 /// (Etapa 18 — `ApiConnectionRepository`, a partir de
 /// `SessionConnectionUpdate.qr`) quando [qrCode] chega do backend; até lá
 /// (ou se a decodificação falhar), mostra o ícone de placeholder que já
-/// existia desde a Etapa 4. O anel animado (`qr_scan_frame.riv`) continua
-/// por cima nos dois casos, dando a sensação de "aguardando escaneamento".
+/// existia desde a Etapa 4. Não há moldura/efeito sobreposto: qualquer
+/// elemento visual sobre os módulos do QR prejudica a leitura pela câmera.
 class _QrCodePlaceholder extends StatelessWidget {
   const _QrCodePlaceholder({this.qrCode});
 
@@ -565,41 +573,29 @@ class _QrCodePlaceholder extends StatelessWidget {
 
     return Center(
       child: SizedBox(
-        width: 180,
-        height: 180,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.borderDivider),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: imageBytes != null
-                  ? Image.memory(
-                      imageBytes,
-                      width: 180,
-                      height: 180,
-                      fit: BoxFit.contain,
-                      gaplessPlayback: true,
-                    )
-                  : const Icon(
-                      Icons.qr_code_2_rounded,
-                      size: 96,
-                      color: AppColors.textSecondary,
-                    ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: RiveAnimation.asset(
-                  'assets/animations/qr_scan_frame.riv',
+        width: 240,
+        height: 240,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderDivider),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: imageBytes != null
+              ? Image.memory(
+                  imageBytes,
+                  width: 240,
+                  height: 240,
                   fit: BoxFit.contain,
+                  filterQuality: FilterQuality.none,
+                  gaplessPlayback: true,
+                )
+              : const Icon(
+                  Icons.qr_code_2_rounded,
+                  size: 112,
+                  color: AppColors.textSecondary,
                 ),
-              ),
-            ),
-          ],
         ),
       ),
     );
