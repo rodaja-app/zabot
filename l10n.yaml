@@ -5,3 +5,6 @@ output-class: AppLocalizations
 output-dir: lib/l10n/generated
 synthetic-package: false
 nullable-getter: false
+# Trata aspas simples no ARB como escape ICU. Isso mantém `{ID1}` literal
+# nos textos de ajuda, em vez de gerar uma função que pede um parâmetro ID1.
+use-escaping: true
