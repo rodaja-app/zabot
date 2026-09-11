@@ -77,7 +77,7 @@ class RealtimeClient {
         }));
     timeout = Timer(const Duration(seconds: 10), () => finish(() {
           if (!completer.isCompleted) {
-            completer.completeError(const TimeoutException('Tempo esgotado ao conectar ao canal em tempo real.'));
+            completer.completeError(TimeoutException('Tempo esgotado ao conectar ao canal em tempo real.'));
           }
         }));
     socket.connect();
