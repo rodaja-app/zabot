@@ -70,14 +70,18 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     this.sessionService.statsEvents$.subscribe(({ userId, ...stats }) => this.emitStats(userId, stats));
   }
 
-  handleConnection(client: Socket): void {
+  async handleConnection(client: Socket): Promise<void> {
     const userId = this.authenticate(client);
     if (!userId) {
       client.disconnect(true);
       return;
     }
     client.data.userId = userId;
-    void client.join(roomFor(userId));
+    await client.join(roomFor(userId));
+    // O cliente só pode pedir QR/código depois de estar na room. Sem este
+    // sinal, o POST podia chegar entre o handshake WebSocket e o `join`, e o
+    // primeiro evento transitório de QR/pareamento era perdido.
+    client.emit('session_ready');
   }
 
   handleDisconnect(): void {

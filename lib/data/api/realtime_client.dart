@@ -67,9 +67,12 @@ class RealtimeClient {
       complete();
     }
 
-    socket.onConnect((_) => finish(() {
-          if (!completer.isCompleted) completer.complete();
-        }));
+    // `connect` significa que o WebSocket abriu, mas ainda não garante que o
+    // servidor concluiu o `join` da room do usuário. O backend confirma isso
+    // com `session_ready`; só então é seguro pedir o QR/código de pareamento.
+    socket.on('session_ready', (_) => finish(() {
+      if (!completer.isCompleted) completer.complete();
+    }));
     socket.onConnectError((error) => finish(() {
           if (!completer.isCompleted) {
             completer.completeError(StateError('Não foi possível conectar ao canal em tempo real: $error'));
