@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:socket_io_client/socket_io_client.dart' as socket_io;
 
 import 'auth_token_store.dart';
@@ -22,6 +24,7 @@ class RealtimeClient {
   final AuthTokenStore tokenStore;
 
   socket_io.Socket? _socket;
+  Future<void>? _connecting;
 
   /// Garante uma conexão viva com o access token atual. Idempotente — se já
   /// conectado, não faz nada. Deve ser chamado (e aguardado) antes de
@@ -30,11 +33,17 @@ class RealtimeClient {
   Future<void> ensureConnected() async {
     if (_socket != null && _socket!.connected) return;
 
+    // Duas chamadas podem acontecer juntas no boot (a inicialização do
+    // repositório e o toque em "Conectar"). Ambas precisam esperar o mesmo
+    // handshake, em vez de descartar/criar sockets concorrentes.
+    final pendingConnection = _connecting;
+    if (pendingConnection != null) return pendingConnection;
+
     final accessToken = await tokenStore.accessToken;
     if (accessToken == null) return;
 
     _socket?.dispose();
-    _socket = socket_io.io(
+    final socket = socket_io.io(
       '$baseUrl/whatsapp',
       socket_io.OptionBuilder()
           .setTransports(['websocket'])
@@ -42,7 +51,37 @@ class RealtimeClient {
           .enableReconnection()
           .build(),
     );
-    _socket!.connect();
+    _socket = socket;
+
+    // `Socket.connect()` só inicia o handshake. Antes, `ensureConnected()`
+    // retornava logo em seguida e o POST de conexão podia gerar QR/código
+    // antes de este cliente entrar na room do usuário; como esses valores
+    // são eventos transitórios, a tela ficava sem nenhum dos dois.
+    final completer = Completer<void>();
+    _connecting = completer.future;
+    Timer? timeout;
+
+    void finish(void Function() complete) {
+      timeout?.cancel();
+      _connecting = null;
+      complete();
+    }
+
+    socket.onConnect((_) => finish(() {
+          if (!completer.isCompleted) completer.complete();
+        }));
+    socket.onConnectError((error) => finish(() {
+          if (!completer.isCompleted) {
+            completer.completeError(StateError('Não foi possível conectar ao canal em tempo real: $error'));
+          }
+        }));
+    timeout = Timer(const Duration(seconds: 10), () => finish(() {
+          if (!completer.isCompleted) {
+            completer.completeError(const TimeoutException('Tempo esgotado ao conectar ao canal em tempo real.'));
+          }
+        }));
+    socket.connect();
+    return completer.future;
   }
 
   /// O socket não relê o token sozinho — o `auth.token` do handshake só é
@@ -52,6 +91,7 @@ class RealtimeClient {
   Future<void> reconnectWithFreshToken() async {
     _socket?.dispose();
     _socket = null;
+    _connecting = null;
     await ensureConnected();
   }
 
@@ -74,5 +114,6 @@ class RealtimeClient {
   void dispose() {
     _socket?.dispose();
     _socket = null;
+    _connecting = null;
   }
 }

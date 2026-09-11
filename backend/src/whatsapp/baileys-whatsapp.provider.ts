@@ -25,6 +25,8 @@ interface ActiveSocket {
   socket: WASocket;
   userId: string;
   phoneNumber?: string;
+  requiresPairing: boolean;
+  pairingCodeRequested: boolean;
 }
 
 const BASE_RECONNECT_DELAY_MS = 1_000;
@@ -104,25 +106,22 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
       ...(agents ? { agent: agents.agent, fetchAgent: agents.fetchAgent } : {}),
     });
 
-    this.sockets.set(sessionId, { socket, userId, phoneNumber });
+    this.sockets.set(sessionId, {
+      socket,
+      userId,
+      phoneNumber,
+      requiresPairing: Boolean(phoneNumber && !state.creds.registered),
+      pairingCodeRequested: false,
+    });
     if (agents) this.scheduleStickyRenewal(sessionId, userId, phoneNumber);
     socket.ev.on('creds.update', saveCreds);
     socket.ev.on('connection.update', (update) => {
       void this.handleConnectionUpdate(sessionId, userId, socket, update);
     });
 
-    if (phoneNumber && !state.creds.registered) {
-      try {
-        const digitsOnly = phoneNumber.replace(/\D/g, '');
-        const code = await socket.requestPairingCode(digitsOnly);
-        this.updates.next({ sessionId, status: 'CONECTANDO', pairingCode: code });
-      } catch (err) {
-        this.logger.error(
-          { event: 'whatsapp_pairing_code_error', sessionId, err },
-          'Falha ao solicitar código de pareamento ao WhatsApp',
-        );
-      }
-    }
+    // O código por telefone só pode ser solicitado depois que o socket entra
+    // em `connecting`. Chamá-lo logo após `makeWASocket()` é uma corrida com
+    // o handshake Noise e costuma falhar como "connection closed".
   }
 
   async stopSession(sessionId: string): Promise<void> {
@@ -261,6 +260,10 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
 
     const { connection, lastDisconnect, qr } = update;
 
+    if (connection === 'connecting') {
+      await this.requestPairingCodeWhenReady(sessionId, socket);
+    }
+
     if (qr) {
       try {
         const qrImage = await QRCode.toDataURL(qr);
@@ -349,6 +352,35 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
       );
     }, delay);
     this.reconnectTimers.set(sessionId, timer);
+  }
+
+  /** Solicita o código uma única vez para este socket, já com o handshake iniciado. */
+  private async requestPairingCodeWhenReady(sessionId: string, socket: WASocket): Promise<void> {
+    const active = this.sockets.get(sessionId);
+    if (
+      !active ||
+      active.socket !== socket ||
+      !active.phoneNumber ||
+      !active.requiresPairing ||
+      active.pairingCodeRequested
+    ) {
+      return;
+    }
+
+    active.pairingCodeRequested = true;
+    try {
+      const digitsOnly = active.phoneNumber.replace(/\D/g, '');
+      const code = await socket.requestPairingCode(digitsOnly);
+      this.updates.next({ sessionId, status: 'CONECTANDO', pairingCode: code });
+    } catch (err) {
+      // Permite uma nova solicitação se o Baileys emitir outro `connecting`
+      // após um restart transitório do handshake.
+      active.pairingCodeRequested = false;
+      this.logger.error(
+        { event: 'whatsapp_pairing_code_error', sessionId, err },
+        'Falha ao solicitar código de pareamento ao WhatsApp',
+      );
+    }
   }
 
   private clearReconnectTimer(sessionId: string): void {
