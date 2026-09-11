@@ -317,6 +317,23 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
         'Conexão caiu — agendando reconexão automática',
       );
       this.updates.next({ sessionId, status: 'CONECTANDO', disconnectReason: reasonLabel });
+      // Roda o IP sticky antes de tentar de novo — sem isto, uma sessão que
+      // nunca chega a `connection === 'open'` NUNCA aciona a renovação
+      // proativa (`scheduleStickyRenewal` só é agendada de novo a cada
+      // `startSession`, e é cancelada por este mesmo bloco antes de disparar
+      // — ver `clearStickyRenewalTimer` acima). Resultado: um IP ruim/banido
+      // pelo WhatsApp (proxy residencial — acontece) fica sendo reusado pra
+      // sempre no loop de reconexão, e a sessão nunca conecta nem por QR nem
+      // por telefone, porque os dois passam pelo mesmo socket/IP. Trocar o IP
+      // a cada queda quebra esse loop.
+      if (this.proxyConfigService.isEnabled) {
+        await this.proxyConfigService.rotateStickyKey(userId, sessionId).catch((err) =>
+          this.logger.error(
+            { event: 'whatsapp_sticky_rotation_on_failure_error', sessionId, err },
+            'Falha ao rotacionar sticky key do proxy após queda de conexão',
+          ),
+        );
+      }
       this.scheduleReconnect(sessionId, userId, phoneNumber);
     }
   }
@@ -369,6 +386,15 @@ export class BaileysWhatsAppProvider extends WhatsAppProvider implements OnModul
         'Falha de conectividade do proxy — tratada como falha de conexão',
       );
       this.updates.next({ sessionId, status: 'CONECTANDO', disconnectReason: reason });
+      // Mesmo motivo do rotate em handleConnectionUpdate: um IP sticky morto
+      // não se corrige sozinho só tentando de novo — sem rotacionar aqui, o
+      // teste de conectividade falharia pra sempre com o mesmo IP ruim.
+      await this.proxyConfigService.rotateStickyKey(userId, sessionId).catch((err) =>
+        this.logger.error(
+          { event: 'whatsapp_sticky_rotation_on_failure_error', sessionId, err },
+          'Falha ao rotacionar sticky key do proxy após falha de conectividade',
+        ),
+      );
       this.scheduleReconnect(sessionId, userId, phoneNumber);
       return 'proxy_failed';
     }
