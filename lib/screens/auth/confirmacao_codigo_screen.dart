@@ -63,10 +63,24 @@ class _ConfirmacaoCodigoScreenState extends State<ConfirmacaoCodigoScreen> {
       _isSubmitting = true;
     });
 
-    final success = await widget.authRepository.confirmCode(
-      email: widget.email,
-      code: _codeController.text.trim(),
-    );
+    bool success;
+    try {
+      success = await widget.authRepository.confirmCode(
+        email: widget.email,
+        code: _codeController.text.trim(),
+      );
+    } on Exception {
+      // Erro de rede (sem resposta do backend, timeout, DNS, etc.) ou
+      // qualquer outra falha inesperada — sem isto, o botão ficava travado
+      // em "Carregando..." pra sempre (exceção propagava sem ninguém
+      // desligar _isSubmitting). Mesmo tratamento de `cadastro_screen.dart`.
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _codeError = l10n.auth_codigo_network_error;
+      });
+      return;
+    }
 
     if (!mounted) return;
 

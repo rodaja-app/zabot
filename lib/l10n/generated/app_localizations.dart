@@ -232,6 +232,12 @@ abstract class AppLocalizations {
   /// **'Código inválido. Tente novamente.'**
   String get auth_codigo_invalid_error;
 
+  /// Erro exibido quando a confirmação de código falha por problema de rede/servidor (sem resposta do backend), em vez de código inválido
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.'**
+  String get auth_codigo_network_error;
+
   /// Botão de confirmação do código
   ///
   /// In pt, this message translates to:
@@ -279,6 +285,12 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Email ou senha inválidos'**
   String get auth_login_invalid_error;
+
+  /// Erro exibido quando o Login falha por problema de rede/servidor (sem resposta do backend), em vez de credenciais inválidas
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.'**
+  String get auth_login_network_error;
 
   /// Link no Login que leva à tela de Cadastro
   ///

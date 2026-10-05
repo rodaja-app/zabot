@@ -83,6 +83,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get auth_codigo_invalid_error => 'Código inválido. Tente novamente.';
 
   @override
+  String get auth_codigo_network_error =>
+      'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.';
+
+  @override
   String get auth_codigo_confirm_button => 'Confirmar';
 
   @override
@@ -105,6 +109,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get auth_login_invalid_error => 'Email ou senha inválidos';
+
+  @override
+  String get auth_login_network_error =>
+      'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.';
 
   @override
   String get auth_login_signup_link => 'Não tem conta? Cadastre-se';

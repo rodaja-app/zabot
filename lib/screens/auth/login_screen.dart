@@ -63,10 +63,24 @@ class _LoginScreenState extends State<LoginScreen> {
       _isSubmitting = true;
     });
 
-    final success = await widget.authRepository.login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    bool success;
+    try {
+      success = await widget.authRepository.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+    } on Exception {
+      // Erro de rede (sem resposta do backend, timeout, DNS, etc.) ou
+      // qualquer outra falha inesperada — sem isto, o botão ficava travado
+      // em "Carregando..." pra sempre (exceção propagava sem ninguém
+      // desligar _isSubmitting). Mesmo tratamento de `cadastro_screen.dart`.
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _formError = l10n.auth_login_network_error;
+      });
+      return;
+    }
 
     if (!mounted) return;
 

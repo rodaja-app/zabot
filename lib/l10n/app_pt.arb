@@ -108,6 +108,10 @@
   "@auth_codigo_invalid_error": {
     "description": "Erro exibido quando o código digitado está incorreto"
   },
+  "auth_codigo_network_error": "Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.",
+  "@auth_codigo_network_error": {
+    "description": "Erro exibido quando a confirmação de código falha por problema de rede/servidor (sem resposta do backend), em vez de código inválido"
+  },
   "auth_codigo_confirm_button": "Confirmar",
   "@auth_codigo_confirm_button": {
     "description": "Botão de confirmação do código"
@@ -140,6 +144,10 @@
   "auth_login_invalid_error": "Email ou senha inválidos",
   "@auth_login_invalid_error": {
     "description": "Erro exibido quando as credenciais de Login estão incorretas"
+  },
+  "auth_login_network_error": "Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.",
+  "@auth_login_network_error": {
+    "description": "Erro exibido quando o Login falha por problema de rede/servidor (sem resposta do backend), em vez de credenciais inválidas"
   },
   "auth_login_signup_link": "Não tem conta? Cadastre-se",
   "@auth_login_signup_link": {
